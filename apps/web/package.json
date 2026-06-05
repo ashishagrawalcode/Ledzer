@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "pnpm --filter @ledzer/database db:generate && next build && cp node_modules/.prisma/client/libquery_engine-rhel-openssl-3.0.x.so.node .next/server/",
+    "build": "pnpm --filter @ledzer/database db:generate && next build",
     "start": "next start",
     "lint": "next lint"
   },

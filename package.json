@@ -4,8 +4,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "lint": "turbo run lint",
-    "postinstall": "prisma generate"
+    "lint": "turbo run lint"
   },
   "devDependencies": {
     "prisma": "^5.10.0",
