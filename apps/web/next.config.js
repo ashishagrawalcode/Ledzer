@@ -2,11 +2,9 @@
 const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: [
-      '@prisma/client',
-      '@prisma/engines',
-      '@ledzer/database',
-    ],
-  },
+      '@ledzer/database'
+    ]
+  }
 }
 
 export default nextConfig
