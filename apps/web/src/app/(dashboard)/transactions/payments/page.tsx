@@ -57,7 +57,7 @@ export default async function PaymentsPage() {
           <div className="flex items-center gap-3">
             <ExportDropdown data={rows} filename="Payments" />
             <Link href="/transactions/payments/new"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-sm hover:bg-amber-600 transition-all">
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 text-foreground font-semibold text-sm hover:bg-amber-600 transition-all">
               <Plus size={15} />New Payment
             </Link>
           </div>
