@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npx prisma generate --schema=../../packages/database/prisma/schema.prisma && next build",
+    "build": "pnpm --filter @ledzer/database prisma generate --schema=prisma/schema.prisma && next build",
     "start": "next start",
     "lint": "next lint"
   },
