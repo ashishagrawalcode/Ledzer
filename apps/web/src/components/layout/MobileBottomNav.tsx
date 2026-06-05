@@ -2,55 +2,140 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FileText, Users, BarChart3, MoreHorizontal, Package, ArrowRightLeft } from 'lucide-react'
+import { LayoutDashboard, FileText, Users, BarChart3, MoreHorizontal, Package, ArrowRightLeft, ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
 
+// Centralized Dictionary for all nested menus
+const SUB_MENUS: Record<string, { label: string; href: string; icon: any }[]> = {
+  Transactions: [
+    { label: 'Sales', href: '/transactions/sales', icon: ArrowRightLeft },
+    { label: 'Payments', href: '/transactions/payments', icon: ArrowRightLeft },
+    { label: 'Receipts', href: '/transactions/receipts', icon: ArrowRightLeft },
+  ],
+  Parties: [
+    { label: 'Customers', href: '/parties/customers', icon: Users },
+    { label: 'Suppliers', href: '/parties/suppliers', icon: Users },
+  ],
+  Reports: [
+    { label: 'P&L', href: '/reports/pnl', icon: BarChart3 },
+    { label: 'Balance Sheet', href: '/reports/balance-sheet', icon: BarChart3 },
+    { label: 'Cash Flow', href: '/reports/cash-flow', icon: BarChart3 },
+    { label: 'Daybook', href: '/reports/daybook', icon: BarChart3 },
+    { label: 'Party Ledger', href: '/reports/party-ledger', icon: BarChart3 },
+  ],
+  Masters: [
+    { label: 'Ledgers', href: '/masters/ledgers', icon: FileText },
+    { label: 'Groups', href: '/masters/groups', icon: FileText },
+    { label: 'Voucher Types', href: '/masters/voucher-types', icon: FileText },
+  ],
+}
+
+// Transactions replaced Invoices in the main bar
 const MOBILE_NAV = [
-  { label: 'Invoices', href: '/invoices', icon: FileText },
+  { label: 'Transactions', href: '/transactions/sales', icon: ArrowRightLeft },
   { label: 'Parties', href: '/parties/customers', icon: Users },
   { spacer: true }, // Spacer for the center Dashboard button
   { label: 'Reports', href: '/reports/pnl', icon: BarChart3 },
   { label: 'More', href: null, icon: MoreHorizontal },
 ]
 
+// Invoices moved to the More drawer
 const MORE_ITEMS = [
-  { label: 'Transactions', href: '/transactions/sales', icon: ArrowRightLeft },
+  { label: 'Invoices', href: '/invoices', icon: FileText },
   { label: 'Inventory', href: '/inventory', icon: Package },
-  { label: 'Masters', href: '/masters/ledgers', icon: FileText },
+  { label: 'Masters', basePath: '/masters', icon: FileText }, // Uses sub-menu dict
 ]
 
 export function MobileBottomNav() {
   const pathname = usePathname()
   const [moreOpen, setMoreOpen] = useState(false)
+  const [subMenu, setSubMenu] = useState<string | null>(null)
 
   // Check if we are currently on the dashboard to highlight the center button differently
   const isDashboardActive = pathname === '/dashboard'
+
+  const handleClose = () => {
+    setMoreOpen(false)
+    setSubMenu(null)
+  }
 
   return (
     <>
       {/* More drawer */}
       {moreOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMoreOpen(false)}>
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={handleClose}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div
             className="absolute bottom-16 left-0 right-0 glass-heavy border-t border-border/8 p-4 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="grid grid-cols-3 gap-3">
-              {MORE_ITEMS.map((item) => {
-                const Icon = item.icon
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMoreOpen(false)}
-                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-foreground/5 hover:bg-foreground/8 transition-colors duration-150"
-                  >
-                    <Icon size={18} className="text-foreground/60" />
-                    <span className="text-xs text-foreground/50">{item.label}</span>
-                  </Link>
-                )
-              })}
+              {/* Back Button inside grid to preserve layout dimensions */}
+              {subMenu && (
+                <button
+                  onClick={() => setSubMenu(null)}
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-foreground/5 hover:bg-foreground/8 transition-colors duration-150 text-teal"
+                >
+                  <ArrowLeft size={18} />
+                  <span className="text-xs font-medium">Back</span>
+                </button>
+              )}
+
+              {subMenu 
+                ? SUB_MENUS[subMenu].map((subItem) => {
+                    const SubIcon = subItem.icon
+                    const isSubActive = pathname === subItem.href
+                    return (
+                      <Link
+                        key={subItem.href}
+                        href={subItem.href}
+                        onClick={handleClose}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl bg-foreground/5 hover:bg-foreground/8 transition-colors duration-150 ${
+                          isSubActive ? 'text-teal border border-teal/10' : ''
+                        }`}
+                      >
+                        <SubIcon size={18} className={isSubActive ? 'text-teal' : 'text-foreground/60'} />
+                        <span className={`text-xs ${isSubActive ? 'text-teal font-medium' : 'text-foreground/50'}`}>{subItem.label}</span>
+                      </Link>
+                    )
+                  })
+                : MORE_ITEMS.map((item) => {
+                    const Icon = item.icon
+                    
+                    // If it has a basePath instead of an href, it opens a submenu (e.g. Masters)
+                    if (item.basePath) {
+                      const isParentActive = pathname.startsWith(item.basePath)
+                      return (
+                        <button
+                          key={item.label}
+                          onClick={() => setSubMenu(item.label)}
+                          className={`flex flex-col items-center gap-1.5 p-3 rounded-xl bg-foreground/5 hover:bg-foreground/8 transition-colors duration-150 ${
+                            isParentActive ? 'text-teal' : ''
+                          }`}
+                        >
+                          <Icon size={18} className={isParentActive ? 'text-teal' : 'text-foreground/60'} />
+                          <span className={`text-xs ${isParentActive ? 'text-teal font-medium' : 'text-foreground/50'}`}>{item.label}</span>
+                        </button>
+                      )
+                    }
+
+                    // Standard direct link (e.g. Invoices, Inventory)
+                    const isItemActive = item.href && pathname.startsWith(item.href)
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href!}
+                        onClick={handleClose}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl bg-foreground/5 hover:bg-foreground/8 transition-colors duration-150 ${
+                          isItemActive ? 'text-teal' : ''
+                        }`}
+                      >
+                        <Icon size={18} className={isItemActive ? 'text-teal' : 'text-foreground/60'} />
+                        <span className={`text-xs ${isItemActive ? 'text-teal font-medium' : 'text-foreground/50'}`}>{item.label}</span>
+                      </Link>
+                    )
+                  })
+              }
             </div>
           </div>
         </div>
@@ -80,15 +165,21 @@ export function MobileBottomNav() {
 
             const Icon = item.icon!
             const isMore = item.href === null
+            
+            // Extract the base path (e.g., "/transactions/sales" -> "/transactions") to check if active
+            const itemBasePath = item.href ? item.href.split('/').slice(0, 2).join('/') : ''
             const isActive = isMore
               ? moreOpen
-              : (pathname === item.href || (item.href && pathname.startsWith(item.href + '/')))
+              : (pathname === item.href || pathname.startsWith(itemBasePath))
 
             if (isMore) {
               return (
                 <button
                   key="more"
-                  onClick={() => setMoreOpen(!moreOpen)}
+                  onClick={() => {
+                    setSubMenu(null)
+                    setMoreOpen(!moreOpen)
+                  }}
                   className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all duration-150 ${
                     isActive ? 'text-teal' : 'text-foreground/35 hover:text-foreground/60'
                   }`}
@@ -103,6 +194,17 @@ export function MobileBottomNav() {
               <Link
                 key={item.href}
                 href={item.href!}
+                onClick={(e) => {
+                  // Universal Quality of Life Feature: 
+                  // If the user clicks an active main tab that has a sub-menu dictionary, open the drawer.
+                  if (isActive && SUB_MENUS[item.label]) {
+                    e.preventDefault()
+                    setSubMenu(item.label)
+                    setMoreOpen(true)
+                  } else {
+                    handleClose()
+                  }
+                }}
                 className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all duration-150 ${
                   isActive
                     ? 'text-teal'
