@@ -4,14 +4,9 @@ const nextConfig = {
     serverComponentsExternalPackages: [
       '@prisma/client',
       '@prisma/engines',
-      '@ledzer/database'
-    ]
+      '@ledzer/database',
+    ],
   },
-
-  webpack: (config) => {
-    config.externals.push('@prisma/client')
-    return config
-  }
 }
 
 export default nextConfig
