@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "pnpm --filter @ledzer/database prisma generate && next build",
+    "build": "pnpm --filter @ledzer/database db:generate && next build",
     "start": "next start",
     "lint": "next lint"
   },
