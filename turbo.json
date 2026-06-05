@@ -7,7 +7,7 @@
     "GOOGLE_CLIENT_SECRET",
     "PRISMA_CLI_BINARY_TARGETS"
   ],
-  "pipeline": {
+  "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**"]
