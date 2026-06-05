@@ -46,24 +46,24 @@ export function NewLedgerForm({ businessId }: { businessId: string }) {
 
   return (
     <div className="space-y-5">
-      <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors">
+      <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-foreground/40 hover:text-foreground/70 transition-colors">
         <ArrowLeft size={14} />Back
       </button>
 
       <div className="glass rounded-2xl border border-border/5 p-6 space-y-6">
         <div>
-          <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Ledger Name *</label>
+          <label className="block text-xs font-semibold text-foreground/40 uppercase tracking-wider mb-2">Ledger Name *</label>
           <input
             value={name}
             onChange={(e) => { setName(e.target.value); setError(null) }}
             placeholder="e.g. HDFC Bank Account"
             autoFocus
-            className="w-full px-4 py-3 rounded-xl bg-foreground/5 border border-border/10 text-white placeholder:text-white/20 text-sm focus:outline-none focus:border-teal/50 focus:bg-teal/3 transition-all duration-200"
+            className="w-full px-4 py-3 rounded-xl bg-foreground/5 border border-border/10 text-foreground placeholder:text-foreground/20 text-sm focus:outline-none focus:border-teal/50 focus:bg-teal/3 transition-all duration-200"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">Account Group *</label>
+          <label className="block text-xs font-semibold text-foreground/40 uppercase tracking-wider mb-3">Account Group *</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {GROUPS.map((g) => (
               <button
@@ -73,7 +73,7 @@ export function NewLedgerForm({ businessId }: { businessId: string }) {
                 className={`flex flex-col gap-1 px-4 py-3 rounded-xl border transition-all duration-150 text-left ${
                   group === g
                     ? 'bg-teal/10 border-teal/40 text-teal'
-                    : 'bg-foreground/3 border-border/8 text-white/60 hover:border-border/15 hover:text-white'
+                    : 'bg-foreground/3 border-border/8 text-foreground/60 hover:border-border/15 hover:text-foreground'
                 }`}
               >
                 <span className="text-sm font-semibold">{getGroupLabel(g, terminologyMode)}</span>
@@ -84,7 +84,7 @@ export function NewLedgerForm({ businessId }: { businessId: string }) {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Opening Balance <span className="text-white/20 font-normal normal-case tracking-normal">(Optional)</span></label>
+          <label className="block text-xs font-semibold text-foreground/40 uppercase tracking-wider mb-2">Opening Balance <span className="text-foreground/20 font-normal normal-case tracking-normal">(Optional)</span></label>
           <div className="flex gap-2">
             <input
               type="number"
@@ -93,7 +93,7 @@ export function NewLedgerForm({ businessId }: { businessId: string }) {
               value={openingBalance}
               onChange={(e) => setOpeningBalance(e.target.value)}
               placeholder="0.00"
-              className="flex-1 px-4 py-3 rounded-xl bg-foreground/5 border border-border/10 text-white font-mono placeholder:text-white/20 text-sm focus:outline-none focus:border-teal/50 transition-all duration-200"
+              className="flex-1 px-4 py-3 rounded-xl bg-foreground/5 border border-border/10 text-foreground font-mono placeholder:text-foreground/20 text-sm focus:outline-none focus:border-teal/50 transition-all duration-200"
             />
             <div className="flex rounded-xl border border-border/10 overflow-hidden">
               {(['DEBIT', 'CREDIT'] as const).map((t) => (
@@ -102,7 +102,7 @@ export function NewLedgerForm({ businessId }: { businessId: string }) {
                   type="button"
                   onClick={() => setOpeningType(t)}
                   className={`px-4 py-3 text-xs font-semibold transition-all duration-150 ${
-                    openingType === t ? (t === 'DEBIT' ? 'bg-teal text-navy' : 'bg-red-400/80 text-white') : 'text-white/40 hover:text-white hover:bg-foreground/5'
+                    openingType === t ? (t === 'DEBIT' ? 'bg-teal text-navy' : 'bg-red-400/80 text-foreground') : 'text-foreground/40 hover:text-foreground hover:bg-foreground/5'
                   }`}
                 >
                   {t === 'DEBIT' ? 'Dr' : 'Cr'}
@@ -110,7 +110,7 @@ export function NewLedgerForm({ businessId }: { businessId: string }) {
               ))}
             </div>
           </div>
-          <p className="text-xs text-white/25 mt-1.5">Enter the balance as on your financial year start date</p>
+          <p className="text-xs text-foreground/25 mt-1.5">Enter the balance as on your financial year start date</p>
         </div>
 
         {error && (
@@ -129,7 +129,7 @@ export function NewLedgerForm({ businessId }: { businessId: string }) {
             {isPending ? <div className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" /> : <Save size={15} />}
             {isPending ? 'Saving…' : 'Create Ledger'}
           </button>
-          <button onClick={() => router.back()} className="px-6 py-3 rounded-xl border border-border/10 text-white/60 hover:text-white text-sm transition-all duration-200">Cancel</button>
+          <button onClick={() => router.back()} className="px-6 py-3 rounded-xl border border-border/10 text-foreground/60 hover:text-foreground text-sm transition-all duration-200">Cancel</button>
         </div>
       </div>
     </div>

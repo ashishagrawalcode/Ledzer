@@ -65,18 +65,18 @@ export function LedgersList({
       {/* Search + group filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/30" />
           <input
             value={searchVal}
             onChange={(e) => { setSearchVal(e.target.value); pushFilters(e.target.value, groupFilter) }}
             placeholder="Search ledgers…"
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-foreground/5 border border-border/8 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-teal/40 transition-all duration-200"
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-foreground/5 border border-border/8 text-sm text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-teal/40 transition-all duration-200"
           />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={() => pushFilters(searchVal, '')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${!groupFilter ? 'bg-teal/15 text-teal border border-teal/25' : 'bg-foreground/5 text-white/40 border border-border/8 hover:text-white'}`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${!groupFilter ? 'bg-teal/15 text-teal border border-teal/25' : 'bg-foreground/5 text-foreground/40 border border-border/8 hover:text-foreground'}`}
           >
             All
           </button>
@@ -84,7 +84,7 @@ export function LedgersList({
             <button
               key={g}
               onClick={() => pushFilters(searchVal, groupFilter === g ? '' : g)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${groupFilter === g ? 'bg-teal/15 text-teal border border-teal/25' : 'bg-foreground/5 text-white/40 border border-border/8 hover:text-white'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${groupFilter === g ? 'bg-teal/15 text-teal border border-teal/25' : 'bg-foreground/5 text-foreground/40 border border-border/8 hover:text-foreground'}`}
             >
               {getGroupLabel(g, terminologyMode)}
             </button>
@@ -95,7 +95,7 @@ export function LedgersList({
       {/* No results */}
       {ledgers.length === 0 && (
         <div className="glass rounded-2xl border border-border/5 flex flex-col items-center justify-center py-20 gap-3">
-          <p className="text-white/30">No ledgers found</p>
+          <p className="text-foreground/30">No ledgers found</p>
         </div>
       )}
 
@@ -106,13 +106,13 @@ export function LedgersList({
           <div className="flex items-center justify-between px-6 py-3 border-b border-border/5 bg-foreground/[0.02]">
             <div className="flex items-center gap-2.5">
               <StatusBadge label={getGroupLabel(group, terminologyMode)} variant={GROUP_COLORS[group] as never} dot />
-              <span className="text-xs text-white/30">{items.length} account{items.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-foreground/30">{items.length} account{items.length !== 1 ? 's' : ''}</span>
             </div>
             <span className={`font-mono text-sm font-semibold ${
               group === 'INCOME' ? 'text-teal' :
               group === 'EXPENSE' ? 'text-red-400' :
               group === 'ASSET' ? 'text-blue-400' :
-              'text-white/50'
+              'text-foreground/50'
             }`}>
               {formatCurrency(items.reduce((s, i) => s + i.balance, 0), currency)}
             </span>
@@ -128,25 +128,25 @@ export function LedgersList({
                 <div className="flex items-center gap-3 min-w-0">
                   {ledger.isSystem && (
                     <div className="flex-shrink-0 w-5 h-5 rounded-md bg-foreground/5 flex items-center justify-center" title="System ledger">
-                      <Lock size={10} className="text-white/25" />
+                      <Lock size={10} className="text-foreground/25" />
                     </div>
                   )}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/masters/ledgers/${ledger.id}`}
-                        className="text-sm font-medium text-white hover:text-teal transition-colors duration-150 flex items-center gap-1 group"
+                        className="text-sm font-medium text-foreground hover:text-teal transition-colors duration-150 flex items-center gap-1 group"
                       >
                         {ledger.name}
                         <ExternalLink size={10} className="opacity-0 group-hover:opacity-60 transition-opacity" />
                       </Link>
                       {ledger.partyType && (
-                        <span className="text-[10px] text-white/25 bg-foreground/5 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] text-foreground/25 bg-foreground/5 px-1.5 py-0.5 rounded">
                           {ledger.partyType}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-white/25 mt-0.5">
+                    <p className="text-xs text-foreground/25 mt-0.5">
                       {ledger.entryCount} transaction{ledger.entryCount !== 1 ? 's' : ''}
                       {ledger.isSystem ? ' · System' : ''}
                     </p>
@@ -154,14 +154,14 @@ export function LedgersList({
                 </div>
                 <div className="text-right flex-shrink-0 ml-4">
                   <p className={`font-mono text-sm font-semibold tabular-nums ${
-                    ledger.balance > 0 ? 'text-white' :
+                    ledger.balance > 0 ? 'text-foreground' :
                     ledger.balance < 0 ? 'text-red-400' :
-                    'text-white/25'
+                    'text-foreground/25'
                   }`}>
                     {ledger.balance !== 0 ? formatCurrency(Math.abs(ledger.balance), currency) : 'Nil'}
                   </p>
                   {ledger.balance !== 0 && (
-                    <p className="text-[10px] text-white/25 mt-0.5">
+                    <p className="text-[10px] text-foreground/25 mt-0.5">
                       {ledger.balance > 0 ? 'Dr' : 'Cr'}
                     </p>
                   )}
