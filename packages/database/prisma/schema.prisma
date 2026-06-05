@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------
+// 1. NEXTAUTH TABLES (Secure Login)
+// ------------------------------------------------------
+model User {
+  id            String     @id @default(cuid())
+  name          String?
+  email         String?    @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  businesses    Business[] 
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------
+// 2. LEDZER CORE ERP (The Accounting Engine)
+// ------------------------------------------------------
+
+// The main tenant. A user can own a Business.
+model Business {
+  id        String    @id @default(cuid())
+  name      String
+  gstin     String?
+  currency  String    @default("INR")
+  fiscalYearStart     DateTime?
+  ownerId   String
+  owner     User      @relation(fields: [ownerId], references: [id])
+  parties   Party[]
+  ledgers   Ledger[]
+  vouchers  Voucher[]
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// Jargon-Free: "People & Businesses" (Customers/Suppliers)
+model Party {
+  id         String    @id @default(cuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  type       PartyType 
+  name       String
+  email      String?
+  phone      String?
+  gstin      String?
+  // Every party is secretly an accounting ledger under the hood
+  ledgerId   String    @unique
+  ledger     Ledger    @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+enum PartyType {
+  CUSTOMER
+  SUPPLIER
+}
+
+// Jargon-Free: "Accounts" (Cash, Bank, Sales, Rent, Party Ledgers)
+model Ledger {
+  id         String         @id @default(cuid())
+  businessId String
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  group      AccountGroup   // Asset, Liability, Income, Expense
+  isSystem   Boolean        @default(false) // Protects core ledgers like "Cash" from deletion
+  party      Party?
+  entries    VoucherEntry[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+}
+
+enum AccountGroup {
+  ASSET
+  LIABILITY
+  INCOME
+  EXPENSE
+  EQUITY
+}
+
+// The Transaction Wrapper (Invoice, Payment, Receipt)
+model Voucher {
+  id         String         @id @default(cuid())
+  businessId String
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  type       VoucherType
+  number     String         // E.g., "INV-001" or "REC-042"
+  date       DateTime
+  notes      String?
+  entries    VoucherEntry[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+}
+
+enum VoucherType {
+  SALES
+  PURCHASE
+  RECEIPT
+  PAYMENT
+  JOURNAL
+  CONTRA
+}
+
+// The Double-Entry Lines (Debits and Credits)
+model VoucherEntry {
+  id        String    @id @default(cuid())
+  voucherId String
+  voucher   Voucher   @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  ledgerId  String
+  ledger    Ledger    @relation(fields: [ledgerId], references: [id], onDelete: Restrict)
+  type      EntryType 
+  amount    Float     // Always positive. The type (DEBIT/CREDIT) determines the math.
+}
+
+enum EntryType {
+  DEBIT
+  CREDIT
+}
+
+// ------------------------------------------------------
+// 3. INVENTORY MANAGEMENT
+// ------------------------------------------------------
+model Product {
+  id            String   @id @default(cuid())
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  name          String
+  sku           String?
+  unit          String   @default("PCS") // e.g., PCS, KG, LTR
+  
+  stock         Float?   @default(0)
+  reorderLevel  Float?
+  
+  salePrice     Float?
+  purchasePrice Float?
+  taxRate       Float?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Ensures no two products have the same SKU within the same business
+  @@unique([businessId, sku])
+}
