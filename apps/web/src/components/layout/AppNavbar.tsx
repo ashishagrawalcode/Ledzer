@@ -14,7 +14,7 @@ import {
 import { usePreferencesStore } from '@/store/usePreferencesStore'
 import { getDictionary } from '@/lib/dictionary'
 import { getInitials, cn } from '@/lib/utils'
-import { globalSearch, type SearchResult } from '@/actions/globalsearch'
+import { globalSearch, type SearchResult } from '@/actions/globalSearch'
 import type { Session } from 'next-auth'
 
 interface AppNavbarProps {
