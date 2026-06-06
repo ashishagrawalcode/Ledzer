@@ -41,6 +41,7 @@ interface NavItem {
 // ─── All nav pages for search ─────────────────────────────────────────────────
 const NAV_PAGES = [
   { label: 'Dashboard',      href: '/dashboard',              icon: LayoutDashboard  },
+  { label: 'Invoices',       href: '/transactions/invoices',  icon: FileText         },
   { label: 'Sales Invoices', href: '/transactions/sales',     icon: FileText         },
   { label: 'Purchase Bills', href: '/transactions/purchases', icon: ShoppingCart     },
   { label: 'Receipts',       href: '/transactions/receipts',  icon: Receipt          },
@@ -594,6 +595,10 @@ export function AppNavbar({ session, businessName }: AppNavbarProps) {
         { label: 'Contra',         href: '/transactions/contra',    icon: ArrowRightLeft, description: 'Cash & bank transfers',             newHref: '/transactions/contra/new',    newLabel: 'New Contra'   },
       ],
     },
+    // {
+    //   label: dict.invoices ?? 'Invoices',
+    //   icon: FileText,
+    // },
     {
       label: dict.masters ?? 'Masters',
       icon: Layers,

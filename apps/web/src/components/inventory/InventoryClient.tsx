@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createProduct, updateProduct, deleteProduct } from '@/actions/inventory'
+import { ExportDropdown } from '@/components/shared/ExportDropdown'
+import { PageHeader } from '@/components/shared/PageHeader'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
@@ -381,6 +383,26 @@ export function InventoryClient({ products, currency, search }: InventoryClientP
 
   return (
     <>
+      {/* 1. NEW: The Header is now inside the Client Component! */}
+      <PageHeader
+        title="Inventory"
+        subtitle={`${products.length} product${products.length !== 1 ? 's' : ''}${lowStock > 0 ? ` · ${lowStock} low stock` : ''}`}
+        badge="Inventory"
+        actions={
+          <div className="flex items-center gap-3">
+            <ExportDropdown data={products} filename="Inventory_Status" />
+           
+            <button
+              onClick={() => setShowForm(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-all shadow-glow"
+            >
+              <Plus size={15} />
+              <span className="hidden sm:inline">Add Product</span>
+            </button>
+          </div>
+        }
+      />
+
       {/* Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {[
@@ -445,15 +467,6 @@ export function InventoryClient({ products, currency, search }: InventoryClientP
             </button>
           ))}
         </div>
-
-        {/* Add Button */}
-        <button
-          onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-all shadow-glow flex-shrink-0"
-        >
-          <Plus size={15} />
-          <span className="hidden sm:inline">Add Product</span>
-        </button>
       </div>
 
       {/* Table / Cards */}

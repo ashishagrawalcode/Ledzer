@@ -125,6 +125,10 @@ model Voucher {
   date       DateTime
   notes      String?
   entries    VoucherEntry[]
+  taxRate      Float    @default(0) // User selects this (e.g., 5, 12, 18, 13)
+  totalTax     Float    @default(0) // Calculated based on taxRate
+  netAmount    Float    // subtotal + totalTax
+  lineItems    Json?
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 }

@@ -35,20 +35,6 @@ export default async function InventoryPage({ searchParams }: { searchParams: { 
 
   return (
     <div className="w-full animate-fade-up">
-      <PageHeader
-        title="Inventory"
-        subtitle={`${products.length} product${products.length !== 1 ? 's' : ''}${lowStockCount > 0 ? ` · ${lowStockCount} low stock` : ''}`}
-        badge="Inventory"
-        actions={
-          <div className="flex items-center gap-3">
-            <ExportDropdown data={products} filename="Inventory_Status" />
-            <Link href="/inventory/new"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-all shadow-glow">
-              <Plus size={15} />Add Product
-            </Link>
-          </div>
-        }
-      />
       <InventoryClient
         products={products.map((p) => ({
           id: p.id, name: p.name, sku: p.sku, unit: p.unit,
