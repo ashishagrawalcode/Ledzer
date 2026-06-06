@@ -9,7 +9,6 @@ import { TrendingUp, TrendingDown, Wallet, Clock, AlertTriangle, ArrowUpRight, A
 import Link from 'next/link'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 
-// THE HYDRATION FIX: Dynamically import the chart and completely disable SSR for it
 const DashboardChart = dynamic(
   () => import('@/components/dashboard/DashboardChart').then((mod) => mod.DashboardChart),
   { 
@@ -159,7 +158,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
           <p className="text-foreground/40 text-sm mt-1">{data.businessName} · Today, {formatDate(new Date())}</p>
         </div>
         <Link
-          href="/transactions/sales"
+          href="/invoices"
           className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all duration-200 shadow-glow hover:shadow-glow-md"
         >
           <Plus size={15} />
@@ -279,7 +278,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
             </div>
             <p className="text-sm text-foreground/25">No transactions yet</p>
             <Link
-              href="/transactions/sales"
+              href="/invoices"
               className="text-xs text-teal/60 hover:text-teal transition-colors duration-200 underline underline-offset-2"
             >
               Create your first invoice

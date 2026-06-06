@@ -189,7 +189,7 @@ export const SIMPLE_TERMS: TermDictionary = {
   payments: 'Money Out',
   journals: 'Adjustments',
   contra: 'Bank Transfer',
-  masters: 'Settings',
+  masters: 'Masters',
   ledgers: 'Accounts',
   groups: 'Categories',
   voucherTypes: 'Config',

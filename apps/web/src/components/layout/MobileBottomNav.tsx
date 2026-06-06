@@ -23,11 +23,30 @@ export function MobileBottomNav() {
       { label: t('journals'), href: '/transactions/journals', icon: ArrowRightLeft },
       { label: t('contra'), href: '/transactions/contra', icon: ArrowRightLeft },
     ],
+    Activity: [
+      { label: t('salesInvoices'), href: '/transactions/sales', icon: ArrowRightLeft },
+      { label: t('purchaseBills'), href: '/transactions/purchases', icon: ArrowRightLeft },
+      { label: t('payments'), href: '/transactions/payments', icon: ArrowRightLeft },
+      { label: t('receipts'), href: '/transactions/receipts', icon: ArrowRightLeft },
+      { label: t('journals'), href: '/transactions/journals', icon: ArrowRightLeft },
+      { label: t('contra'), href: '/transactions/contra', icon: ArrowRightLeft },
+    ],
     Parties: [
       { label: t('customers'), href: '/parties/customers', icon: Users },
       { label: t('suppliers'), href: '/parties/suppliers', icon: Users },
     ],
+    Contacts: [
+      { label: t('customers'), href: '/parties/customers', icon: Users },
+      { label: t('suppliers'), href: '/parties/suppliers', icon: Users },
+    ],
     Reports: [
+      { label: t('profitAndLoss'), href: '/reports/pnl', icon: BarChart3 },
+      { label: t('balanceSheet'), href: '/reports/balance-sheet', icon: BarChart3 },
+      { label: t('cashFlow'), href: '/reports/cashflow', icon: BarChart3 },
+      { label: t('dayBook'), href: '/reports/daybook', icon: BarChart3 },
+      { label: t('partyLedger'), href: '/reports/party-ledger', icon: BarChart3 },
+    ],
+    Analytics: [
       { label: t('profitAndLoss'), href: '/reports/pnl', icon: BarChart3 },
       { label: t('balanceSheet'), href: '/reports/balance-sheet', icon: BarChart3 },
       { label: t('cashFlow'), href: '/reports/cashflow', icon: BarChart3 },
