@@ -2,6 +2,7 @@
 
 import { auth } from '@/lib/auth'
 import { prisma } from '@ledzer/database'
+import { input } from 'framer-motion/m'
 import { revalidatePath } from 'next/cache'
 
 interface ReceiptPaymentInput {
@@ -65,6 +66,7 @@ export async function createReceiptPayment(data: ReceiptPaymentInput) {
         notes: data.notes
           ? `[${data.paymentMode}] ${data.notes}`
           : `[${data.paymentMode}]`,
+        netAmount: data.amount,
         entries: {
           create: [
             {

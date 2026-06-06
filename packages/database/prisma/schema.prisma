@@ -136,9 +136,9 @@ model Voucher {
 enum VoucherType {
   SALES
   PURCHASE
+  JOURNAL
   RECEIPT
   PAYMENT
-  JOURNAL
   CONTRA
 }
 

@@ -49,6 +49,7 @@ export async function createVoucher(input: CreateVoucherInput) {
         number,
         date: input.date,
         notes: input.notes ?? null,
+        netAmount: debits, // or credits, they are equal
         entries: {
           create: input.entries.map((e) => ({
             ledgerId: e.ledgerId,

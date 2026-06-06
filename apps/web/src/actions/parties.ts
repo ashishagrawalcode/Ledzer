@@ -59,11 +59,12 @@ export async function createParty(input: {
         const oppositeType = entryType === 'DEBIT' ? 'CREDIT' : 'DEBIT'
         await tx.voucher.create({
           data: {
-            business: { connect: { id: input.businessId } },
+            businessId: input.businessId,
             type: 'JOURNAL',
             number: `OB-${party.id.slice(-4)}`,
             date: new Date(),
             notes: `Opening balance for ${input.name}`,
+            netAmount: input.openingBalance,
             entries: {
               create: [
                 { ledgerId: ledger.id, type: entryType, amount: input.openingBalance },

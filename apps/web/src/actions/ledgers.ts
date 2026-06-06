@@ -40,11 +40,12 @@ export async function createLedger(input: {
       const oppositeType = input.openingType === 'DEBIT' ? 'CREDIT' : 'DEBIT'
       await db.voucher.create({
         data: {
-          businessId: input.businessId,
+          business: { connect: { id: input.businessId } },
           type: 'JOURNAL',
           number: `OB-${ledger.id.slice(-4)}`,
           date: new Date(),
           notes: `Opening balance for ${input.name}`,
+          netAmount: input.openingBalance,
           entries: {
             create: [
               { ledgerId: ledger.id, type: input.openingType!, amount: input.openingBalance },
