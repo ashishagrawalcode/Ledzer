@@ -30,7 +30,7 @@ export function MobileBottomNav() {
     Reports: [
       { label: t('profitAndLoss'), href: '/reports/pnl', icon: BarChart3 },
       { label: t('balanceSheet'), href: '/reports/balance-sheet', icon: BarChart3 },
-      { label: t('cashFlow'), href: '/reports/cash-flow', icon: BarChart3 },
+      { label: t('cashFlow'), href: '/reports/cashflow', icon: BarChart3 },
       { label: t('dayBook'), href: '/reports/daybook', icon: BarChart3 },
       { label: t('partyLedger'), href: '/reports/party-ledger', icon: BarChart3 },
     ],
