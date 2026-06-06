@@ -2,27 +2,27 @@ import { auth } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@ledzer/database'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { PartyLedgerClient } from '@/components/parties/PartyLedgerClient'
-import { format } from 'date-fns'
+import { PartyDetailClient } from '@/components/parties/PartyDetailClient'
+import { ExportDropdown } from '@/components/shared/ExportDropdown'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
-  return { title: 'Party Ledger · Ledzer' }
+interface Props {
+  params: { id: string }
 }
 
-export default async function PartyLedgerPage({
-  params,
-}: {
-  params: { id: string }
-}) {
+export async function generateMetadata({ params }: Props) {
+  return { title: 'Party Ledger' }
+}
+
+export default async function PartyDetailPage({ params }: Props) {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
-  const business = await prisma.business.findFirst({
-    where: { ownerId: session.user.id },
-  })
+  const business = await prisma.business.findFirst({ where: { ownerId: session.user.id } })
   if (!business) redirect('/dashboard')
 
-  // Fetch party with its ledger
+  // Find party and verify it belongs to this business
   const party = await prisma.party.findFirst({
     where: { id: params.id, businessId: business.id },
     include: {
@@ -34,7 +34,7 @@ export default async function PartyLedgerPage({
                 select: { id: true, number: true, type: true, date: true, notes: true },
               },
             },
-            orderBy: { voucher: { date: 'asc' } },
+            orderBy: { voucher: { date: 'desc' } },
           },
         },
       },
@@ -43,50 +43,87 @@ export default async function PartyLedgerPage({
 
   if (!party) notFound()
 
-  // Build running balance ledger
-  let balance = 0
-  const ledgerRows = party.ledger.entries.map((entry) => {
-    const debit = entry.type === 'DEBIT' ? entry.amount : 0
-    const credit = entry.type === 'CREDIT' ? entry.amount : 0
-    balance += debit - credit
+  // Compute running balance
+  let runningBalance = 0
+  const entries = party.ledger.entries.map((e) => {
+    const signed = e.type === 'DEBIT' ? e.amount : -e.amount
+    runningBalance += signed
     return {
-      id: entry.id,
-      date: format(new Date(entry.voucher.date), 'dd MMM yyyy'),
-      voucherNumber: entry.voucher.number,
-      voucherType: entry.voucher.type,
-      notes: entry.voucher.notes ?? null,
-      debit: debit || null,
-      credit: credit || null,
-      balance,
+      id: e.id,
+      voucherId: e.voucher.id,
+      voucherNumber: e.voucher.number,
+      voucherType: e.voucher.type,
+      date: e.voucher.date,
+      notes: e.voucher.notes,
+      entryType: e.type,
+      amount: e.amount,
+      balance: runningBalance,
     }
   })
+  // reverse so most recent is first, but balance runs correctly
+  const entriesChronological = [...entries].reverse()
 
-  // Summary
-  const totalDebit = party.ledger.entries.filter(e => e.type === 'DEBIT').reduce((s, e) => s + e.amount, 0)
-  const totalCredit = party.ledger.entries.filter(e => e.type === 'CREDIT').reduce((s, e) => s + e.amount, 0)
-  const closingBalance = totalDebit - totalCredit
+  const closingBalance = party.ledger.entries.reduce(
+    (s, e) => (e.type === 'DEBIT' ? s + e.amount : s - e.amount),
+    0
+  )
+
+  const totalDebits = party.ledger.entries
+    .filter((e) => e.type === 'DEBIT')
+    .reduce((s, e) => s + e.amount, 0)
+  const totalCredits = party.ledger.entries
+    .filter((e) => e.type === 'CREDIT')
+    .reduce((s, e) => s + e.amount, 0)
+
+  const exportData = entriesChronological.map((e) => ({
+    Date: new Date(e.date).toLocaleDateString('en-IN'),
+    Voucher: e.voucherNumber,
+    Type: e.voucherType,
+    Description: e.notes ?? '',
+    Debit: e.entryType === 'DEBIT' ? e.amount : '',
+    Credit: e.entryType === 'CREDIT' ? e.amount : '',
+    Balance: e.balance,
+  }))
+
+  const backHref =
+    party.type === 'CUSTOMER' ? '/parties/customers' : '/parties/suppliers'
 
   return (
-    <div className="w-full animate-fade-up space-y-6">
+    <div className="w-full animate-fade-up">
+      <div className="mb-4">
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft size={14} />
+          Back to {party.type === 'CUSTOMER' ? 'Customers' : 'Suppliers'}
+        </Link>
+      </div>
+
       <PageHeader
         title={party.name}
-        subtitle={`${party.type === 'CUSTOMER' ? 'Customer' : 'Supplier'} · ${party.email ?? 'N/A'} · ${party.phone ?? 'N/A'}`}
+        subtitle={`${party.type === 'CUSTOMER' ? 'Customer' : 'Supplier'} · ${entriesChronological.length} transaction${entriesChronological.length !== 1 ? 's' : ''}`}
         badge={party.type === 'CUSTOMER' ? 'Customer' : 'Supplier'}
-        backHref={party.type === 'CUSTOMER' ? '/parties/customers' : '/parties/suppliers'}
+        actions={
+          <ExportDropdown data={exportData} filename={`Ledger_${party.name.replace(/\s+/g, '_')}`} />
+        }
       />
-      <PartyLedgerClient
+
+      <PartyDetailClient
         party={{
           id: party.id,
           name: party.name,
           type: party.type,
-          email: party.email ?? null,
-          phone: party.phone ?? null,
-          gstin: party.gstin ?? null,
+          email: party.email,
+          phone: party.phone,
+          gstin: party.gstin,
         }}
-        ledgerRows={ledgerRows}
-        totalDebit={totalDebit}
-        totalCredit={totalCredit}
-        closingBalance={closingBalance}
+        entries={entriesChronological}
+        summary={{
+          totalDebits,
+          totalCredits,
+          closingBalance,
+        }}
         currency={business.currency ?? 'INR'}
       />
     </div>

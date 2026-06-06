@@ -15,21 +15,18 @@ export default async function NewPaymentPage() {
   })
   if (!business) redirect('/dashboard')
 
-  // Suppliers + expense ledgers (for "paid to")
   const suppliers = await prisma.party.findMany({
     where: { businessId: business.id, type: 'SUPPLIER' },
     select: { id: true, name: true, ledgerId: true },
     orderBy: { name: 'asc' },
   })
 
-  // Expense ledgers as alternative payee (rent, salary, etc.)
   const expenseLedgers = await prisma.ledger.findMany({
     where: { businessId: business.id, group: 'EXPENSE' },
     select: { id: true, name: true },
     orderBy: { name: 'asc' },
   })
 
-  // Cash/Bank ledgers for "paid from"
   const bankCashLedgers = await prisma.ledger.findMany({
     where: {
       businessId: business.id,

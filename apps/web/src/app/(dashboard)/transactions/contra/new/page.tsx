@@ -4,9 +4,9 @@ import { prisma } from '@ledzer/database'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { VoucherForm } from '@/components/transactions/VoucherForm'
 
-export const metadata = { title: 'New Sales Invoice · Ledzer' }
+export const metadata = { title: 'New Contra Entry · Ledzer' }
 
-export default async function NewSalesPage() {
+export default async function NewContraPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
@@ -14,11 +14,11 @@ export default async function NewSalesPage() {
     where: { ownerId: session.user.id },
     include: {
       parties: {
-        where: { type: 'CUSTOMER' },
         select: { id: true, name: true, type: true, ledgerId: true },
         orderBy: { name: 'asc' },
       },
       ledgers: {
+        where: { group: 'ASSET' },
         select: { id: true, name: true, group: true, isSystem: true },
         orderBy: { name: 'asc' },
       },
@@ -29,18 +29,18 @@ export default async function NewSalesPage() {
   return (
     <div className="w-full max-w-4xl animate-fade-up space-y-6">
       <PageHeader
-        title="New Sales Invoice"
-        subtitle="Create a sales voucher with double-entry posting"
+        title="New Contra Entry"
+        subtitle="Transfer funds between cash and bank accounts"
         badge="Transactions"
-        backHref="/transactions/sales"
+        backHref="/transactions/contra"
       />
       <VoucherForm
-        voucherType="SALES"
+        voucherType="CONTRA"
         businessId={business.id}
         currency={business.currency ?? 'INR'}
         parties={business.parties}
         ledgers={business.ledgers}
-        returnHref="/transactions/sales"
+        returnHref="/transactions/contra"
       />
     </div>
   )

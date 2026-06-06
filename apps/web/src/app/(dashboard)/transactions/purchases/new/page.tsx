@@ -4,9 +4,9 @@ import { prisma } from '@ledzer/database'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { VoucherForm } from '@/components/transactions/VoucherForm'
 
-export const metadata = { title: 'New Sales Invoice · Ledzer' }
+export const metadata = { title: 'New Purchase · Ledzer' }
 
-export default async function NewSalesPage() {
+export default async function NewPurchasePage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
@@ -14,7 +14,7 @@ export default async function NewSalesPage() {
     where: { ownerId: session.user.id },
     include: {
       parties: {
-        where: { type: 'CUSTOMER' },
+        where: { type: 'SUPPLIER' },
         select: { id: true, name: true, type: true, ledgerId: true },
         orderBy: { name: 'asc' },
       },
@@ -29,18 +29,18 @@ export default async function NewSalesPage() {
   return (
     <div className="w-full max-w-4xl animate-fade-up space-y-6">
       <PageHeader
-        title="New Sales Invoice"
-        subtitle="Create a sales voucher with double-entry posting"
+        title="New Purchase"
+        subtitle="Record a new purchase bill from a supplier"
         badge="Transactions"
-        backHref="/transactions/sales"
+        backHref="/transactions/purchases"
       />
       <VoucherForm
-        voucherType="SALES"
+        voucherType="PURCHASE"
         businessId={business.id}
         currency={business.currency ?? 'INR'}
         parties={business.parties}
         ledgers={business.ledgers}
-        returnHref="/transactions/sales"
+        returnHref="/transactions/purchases"
       />
     </div>
   )

@@ -1,6 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// FILE: apps/web/src/app/(dashboard)/transactions/payments/page.tsx
-// ─────────────────────────────────────────────────────────────────────────────
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@ledzer/database'

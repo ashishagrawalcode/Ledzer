@@ -15,14 +15,12 @@ export default async function NewReceiptPage() {
   })
   if (!business) redirect('/dashboard')
 
-  // Customers (for "received from")
   const customers = await prisma.party.findMany({
     where: { businessId: business.id, type: 'CUSTOMER' },
     select: { id: true, name: true, ledgerId: true },
     orderBy: { name: 'asc' },
   })
 
-  // Cash/Bank ledgers for "deposited into"
   const bankCashLedgers = await prisma.ledger.findMany({
     where: {
       businessId: business.id,
@@ -38,7 +36,6 @@ export default async function NewReceiptPage() {
     orderBy: { name: 'asc' },
   })
 
-  // Next voucher number
   const lastReceipt = await prisma.voucher.findFirst({
     where: { businessId: business.id, type: 'RECEIPT' },
     orderBy: { createdAt: 'desc' },

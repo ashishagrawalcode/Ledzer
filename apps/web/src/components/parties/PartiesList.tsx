@@ -83,7 +83,7 @@ export function PartiesList({ parties, currency, search: initialSearch, partyTyp
           return (
             <Link
               key={party.id}
-              href={`/parties/${partyType.toLowerCase()}s/${party.id}`}
+              href={`/parties/${party.id}`}
               className="glass rounded-2xl p-5 border border-border/5 hover:border-border/10 transition-all duration-200 hover:scale-[1.01] hover:shadow-card group block"
             >
               <div className="flex items-start gap-3 mb-4">
