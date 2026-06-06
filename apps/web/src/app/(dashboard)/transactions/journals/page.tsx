@@ -77,7 +77,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
             <ExportDropdown data={rows} filename="Journal_Entries" />
             
             <Link
-              href="/transactions/journal/new"
+              href="/transactions/journals/new"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all duration-200 shadow-glow"
             >
               <Plus size={15} />
@@ -94,7 +94,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
         page={page}
         pageSize={pageSize}
         search={search}
-        baseHref="/transactions/journal"
+        baseHref="/transactions/journals"
         voucherType="JOURNAL"
       />
     </div>

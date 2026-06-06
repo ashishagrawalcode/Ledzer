@@ -46,10 +46,6 @@ export function NewPartyForm({ businessId, partyType, returnHref }: NewPartyForm
 
   return (
     <div className="space-y-5">
-      <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-foreground/40 hover:text-foreground/70 transition-colors">
-        <ArrowLeft size={14} />Back
-      </button>
-
       <div className="glass rounded-2xl border border-border/5 p-6 space-y-5">
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">

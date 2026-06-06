@@ -52,7 +52,7 @@ export function HeroSection() {
 
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
-                href="/login"
+                href="/dashboard"
                 className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-teal text-navy font-semibold text-base hover:bg-teal-hover transition-all duration-200 shadow-glow hover:shadow-glow-md group"
               >
                 Start Free

@@ -9,8 +9,11 @@ import { useState } from 'react'
 const SUB_MENUS: Record<string, { label: string; href: string; icon: any }[]> = {
   Transactions: [
     { label: 'Sales', href: '/transactions/sales', icon: ArrowRightLeft },
+    { label: 'Purchases', href: '/transactions/purchases', icon: ArrowRightLeft },
     { label: 'Payments', href: '/transactions/payments', icon: ArrowRightLeft },
     { label: 'Receipts', href: '/transactions/receipts', icon: ArrowRightLeft },
+    { label: 'Journals', href: '/transactions/journals', icon: ArrowRightLeft },
+    { label: 'Contra', href: '/transactions/contra', icon: ArrowRightLeft },
   ],
   Parties: [
     { label: 'Customers', href: '/parties/customers', icon: Users },

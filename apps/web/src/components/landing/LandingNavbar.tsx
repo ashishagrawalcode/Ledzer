@@ -65,7 +65,7 @@ export function LandingNavbar() {
               Sign in
             </Link>
             <Link
-              href="/login"
+              href="/dashboard"
               className="relative inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all duration-200 shadow-glow hover:shadow-glow-md group overflow-hidden"
             >
               <span className="relative z-10">Start Free</span>
@@ -100,13 +100,13 @@ export function LandingNavbar() {
             ))}
             <div className="pt-3 border-t border-white/5 flex flex-col gap-2">
               <Link
-                href="/login"
+                href="/dashboard"
                 className="block text-center px-4 py-2.5 text-white/70 text-sm font-medium"
               >
                 Sign in
               </Link>
               <Link
-                href="/login"
+                href="/dashboard"
                 className="block text-center px-4 py-2.5 rounded-xl bg-teal text-navy font-semibold text-sm"
               >
                 Start Free

@@ -2,8 +2,13 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2, Save, ArrowLeft, AlertCircle } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { 
+  Plus, Trash2, Save, AlertTriangle, CheckCircle, Hash, 
+  Calendar, FileText, Loader2, TrendingUp, ShoppingCart, 
+  ArrowRightLeft, BookOpen, FileSpreadsheet
+} from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { createVoucher } from '@/actions/vouchers'
 
 interface Party { id: string; name: string; type: string; ledgerId: string }
@@ -24,39 +29,48 @@ interface VoucherFormProps {
   ledgers: Ledger[]
   returnHref: string
   initialPartyId?: string
+  nextNumber?: string // Added so you can pass the generated number!
 }
 
 function genId() {
   return Math.random().toString(36).slice(2, 9)
 }
 
-const VOUCHER_TYPE_LABELS: Record<string, string> = {
-  SALES: 'Sales Invoice',
-  PURCHASE: 'Purchase Bill',
-  RECEIPT: 'Receipt',
-  PAYMENT: 'Payment',
-  JOURNAL: 'Journal Entry',
-  CONTRA: 'Contra Entry',
+const VOUCHER_META: Record<string, { label: string, desc: string, icon: any, color: string, bg: string }> = {
+  SALES: { label: 'Sales Invoice', desc: 'Record a sale to a customer', icon: TrendingUp, color: 'text-teal', bg: 'bg-teal/10' },
+  PURCHASE: { label: 'Purchase Bill', desc: 'Record a purchase from a supplier', icon: ShoppingCart, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+  JOURNAL: { label: 'Journal Entry', desc: 'Record adjustments and non-cash entries', icon: BookOpen, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+  CONTRA: { label: 'Contra Entry', desc: 'Transfer funds between Bank and Cash', icon: ArrowRightLeft, color: 'text-blue-500', bg: 'bg-blue-500/10' },
 }
 
 export function VoucherForm({
-  voucherType, businessId, currency, parties, ledgers, returnHref, initialPartyId,
+  voucherType, businessId, currency, parties, ledgers, returnHref, initialPartyId, nextNumber = ''
 }: VoucherFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0])
-  const [notes, setNotes] = useState('')
+  const meta = VOUCHER_META[voucherType] || { label: 'Voucher', desc: 'Accounting entry', icon: FileSpreadsheet, color: 'text-primary', bg: 'bg-primary/10' }
+  const Icon = meta.icon
+  const currSymbol = { INR: '₹', USD: '$', EUR: '€', GBP: '£' }[currency] ?? currency
+
+  // Form State
+  const [form, setForm] = useState({
+    number: nextNumber,
+    date: new Date().toISOString().split('T')[0],
+    notes: ''
+  })
+
   const [entries, setEntries] = useState<EntryLine[]>([
     { id: genId(), ledgerId: initialPartyId ?? '', type: 'DEBIT', amount: '' },
     { id: genId(), ledgerId: '', type: 'CREDIT', amount: '' },
   ])
 
-  const allLedgers: { id: string; name: string; group: string }[] = [
-    ...parties.map((p) => ({ id: p.ledgerId, name: p.name, group: `${p.type === 'CUSTOMER' ? 'Customer' : 'Supplier'}` })),
-    ...ledgers,
-  ]
+  function set(key: keyof typeof form) {
+    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((f) => ({ ...f, [key]: e.target.value }))
+  }
 
   function addEntry() {
     setEntries([...entries, { id: genId(), ledgerId: '', type: 'DEBIT', amount: '' }])
@@ -77,148 +91,188 @@ export function VoucherForm({
   const totalCredits = entries
     .filter((e) => e.type === 'CREDIT')
     .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0)
+  
   const isBalanced = Math.abs(totalDebits - totalCredits) < 0.01
   const hasAmounts = totalDebits > 0
 
   async function handleSubmit() {
     setError(null)
     if (!isBalanced) { setError('Debits must equal Credits for a valid double-entry voucher.'); return }
-    if (!hasAmounts) { setError('Please enter at least one amount.'); return }
+    if (!hasAmounts) { setError('Please enter at least one valid amount.'); return }
     if (entries.some((e) => !e.ledgerId)) { setError('Please select a ledger for all entries.'); return }
 
     startTransition(async () => {
       const result = await createVoucher({
         businessId,
         type: voucherType,
-        date: new Date(date),
-        notes: notes || undefined,
+        // number: form.number.trim() || undefined,
+        date: new Date(form.date),
+        notes: form.notes.trim() || undefined,
         entries: entries.map((e) => ({
           ledgerId: e.ledgerId,
           type: e.type as 'DEBIT' | 'CREDIT',
           amount: parseFloat(e.amount) || 0,
         })),
       })
-      if (result.error) { setError(result.error); return }
-      router.push(returnHref)
-      router.refresh()
+
+      if (result.error) { 
+        setError(result.error)
+        return 
+      }
+      
+      setSuccess(true)
+      setTimeout(() => {
+        router.push(returnHref)
+        router.refresh()
+      }, 1200)
     })
   }
 
   return (
-    <div className="space-y-5">
-      {/* Back */}
-      <button
-        onClick={() => router.back()}
-        className="flex items-center gap-1.5 text-sm text-foreground/40 hover:text-foreground/70 transition-colors duration-150"
-      >
-        <ArrowLeft size={14} />
-        Back
-      </button>
-
-      <div className="glass rounded-2xl border border-border/5 overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-border/5 flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold text-foreground">{VOUCHER_TYPE_LABELS[voucherType] ?? 'Voucher'}</h2>
-            <p className="text-xs text-foreground/30 mt-0.5">All entries post to the general ledger</p>
+    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center gap-3">
+          <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', meta.bg)}>
+            <Icon size={18} className={meta.color} />
           </div>
-          <div className={`px-3 py-1 rounded-lg text-xs font-medium ${
-            isBalanced && hasAmounts ? 'bg-teal/10 text-teal border border-teal/20' : 'bg-foreground/5 text-foreground/30 border border-border/8'
-          }`}>
-            {isBalanced && hasAmounts ? '✓ Balanced' : 'Unbalanced'}
+          <div>
+            <p className="font-semibold text-foreground text-sm">{meta.label}</p>
+            <p className="text-xs text-muted-foreground">{meta.desc}</p>
+          </div>
+        </div>
+        <div className={cn(
+          'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
+          isBalanced && hasAmounts ? 'bg-teal/10 text-teal border border-teal/20' : 'bg-accent text-muted-foreground border border-border'
+        )}>
+          {isBalanced && hasAmounts ? <><CheckCircle size={12}/> Balanced</> : 'Unbalanced'}
+        </div>
+      </div>
+
+      <div className="p-6 space-y-6">
+        {/* Feedback */}
+        {success && (
+          <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-sm">
+            <CheckCircle size={15} />
+            Voucher saved successfully! Redirecting…
+          </div>
+        )}
+        {error && (
+          <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+            <AlertTriangle size={14} />
+            {error}
+          </div>
+        )}
+
+        {/* Voucher Meta Info */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <Hash size={12} /> Voucher No.
+            </label>
+            <input
+              value={form.number}
+              onChange={set('number')}
+              className="w-full px-4 py-2.5 rounded-xl bg-foreground/5 border border-border text-foreground font-mono text-sm focus:outline-none focus:border-primary/50 transition-all"
+              placeholder="Auto-generated if empty"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <Calendar size={12} /> Date
+            </label>
+            <input 
+              type="date" 
+              value={form.date} 
+              onChange={set('date')} 
+              className="w-full px-4 py-2.5 rounded-xl bg-foreground/5 border border-border text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all" 
+            />
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Meta */}
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-foreground/40 uppercase tracking-wider mb-2">Date *</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-foreground/5 border border-border/10 text-foreground text-sm focus:outline-none focus:border-teal/50 focus:bg-teal/3 transition-all duration-200"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-foreground/40 uppercase tracking-wider mb-2">Description / Narration</label>
-              <input
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. Invoice for steel rods supply"
-                className="w-full px-4 py-3 rounded-xl bg-foreground/5 border border-border/10 text-foreground placeholder:text-foreground/20 text-sm focus:outline-none focus:border-teal/50 focus:bg-teal/3 transition-all duration-200"
-              />
-            </div>
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
+            <FileText size={12} /> Notes / Narration
+          </label>
+          <textarea
+            value={form.notes}
+            onChange={set('notes')}
+            rows={2}
+            placeholder="e.g. Sales invoice for electronics..."
+            className="w-full px-4 py-2.5 rounded-xl bg-foreground/5 border border-border text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all resize-none"
+          />
+        </div>
+
+        {/* Double-Entry Grid */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Ledger Entries (Double-Entry)
+            </label>
+            <button
+              onClick={addEntry}
+              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              <Plus size={13} /> Add row
+            </button>
           </div>
 
-          {/* Double-entry table */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-xs font-semibold text-foreground/40 uppercase tracking-wider">
-                Ledger Entries (Double-Entry)
-              </label>
-              <button
-                onClick={addEntry}
-                className="flex items-center gap-1.5 text-xs text-teal/70 hover:text-teal transition-colors duration-150"
-              >
-                <Plus size={12} />
-                Add line
-              </button>
-            </div>
-
-            {/* Header row */}
-            <div className="grid grid-cols-12 gap-3 px-3 mb-2">
-              <div className="col-span-5 text-[10px] text-foreground/25 uppercase font-semibold tracking-wider">Ledger / Account</div>
-              <div className="col-span-3 text-[10px] text-foreground/25 uppercase font-semibold tracking-wider">Dr / Cr</div>
-              <div className="col-span-3 text-[10px] text-foreground/25 uppercase font-semibold tracking-wider text-right">Amount ({currency})</div>
+          <div className="rounded-xl border border-border bg-accent/20 overflow-hidden">
+            {/* Table Header */}
+            <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-accent/40 border-b border-border text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+              <div className="col-span-5">Account / Ledger</div>
+              <div className="col-span-3">Type (Dr/Cr)</div>
+              <div className="col-span-3 text-right">Amount ({currSymbol})</div>
               <div className="col-span-1" />
             </div>
 
-            <div className="space-y-2">
+            {/* Table Body */}
+            <div className="p-2 space-y-2">
               {entries.map((entry) => (
                 <div key={entry.id} className="grid grid-cols-12 gap-3 items-center">
-                  {/* Ledger select */}
+                  {/* Ledger Select */}
                   <div className="col-span-5">
                     <select
                       value={entry.ledgerId}
                       onChange={(e) => updateEntry(entry.id, 'ledgerId', e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl bg-foreground/5 border border-border/10 text-foreground text-sm focus:outline-none focus:border-teal/50 transition-all duration-200 appearance-none"
+                      className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm focus:outline-none focus:border-primary/50 transition-all"
                     >
-                      <option value="" className="bg-navy">Select ledger…</option>
+                      <option value="">— Select Ledger —</option>
                       {parties.length > 0 && (
-                        <optgroup label="Parties (Customers / Suppliers)" className="bg-navy">
+                        <optgroup label="Parties">
                           {parties.map((p) => (
-                            <option key={p.ledgerId} value={p.ledgerId} className="bg-navy">{p.name} ({p.type})</option>
+                            <option key={p.ledgerId} value={p.ledgerId}>{p.name} ({p.type})</option>
                           ))}
                         </optgroup>
                       )}
-                      <optgroup label="Ledgers" className="bg-navy">
+                      <optgroup label="Ledgers">
                         {ledgers.map((l) => (
-                          <option key={l.id} value={l.id} className="bg-navy">{l.name} ({l.group})</option>
+                          <option key={l.id} value={l.id}>{l.name} ({l.group})</option>
                         ))}
                       </optgroup>
                     </select>
                   </div>
 
-                  {/* Dr/Cr toggle */}
+                  {/* Dr/Cr Toggle */}
                   <div className="col-span-3">
-                    <div className="flex rounded-xl border border-border/10 overflow-hidden">
+                    <div className="flex rounded-lg border border-border overflow-hidden bg-background">
                       <button
                         type="button"
                         onClick={() => updateEntry(entry.id, 'type', 'DEBIT')}
-                        className={`flex-1 py-2.5 text-xs font-semibold transition-all duration-150 ${
-                          entry.type === 'DEBIT' ? 'bg-teal text-navy' : 'text-foreground/40 hover:text-foreground hover:bg-foreground/5'
-                        }`}
+                        className={cn(
+                          'flex-1 py-1.5 text-xs font-semibold transition-colors',
+                          entry.type === 'DEBIT' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-accent'
+                        )}
                       >
                         Dr
                       </button>
                       <button
                         type="button"
                         onClick={() => updateEntry(entry.id, 'type', 'CREDIT')}
-                        className={`flex-1 py-2.5 text-xs font-semibold transition-all duration-150 ${
-                          entry.type === 'CREDIT' ? 'bg-red-400/80 text-foreground' : 'text-foreground/40 hover:text-foreground hover:bg-foreground/5'
-                        }`}
+                        className={cn(
+                          'flex-1 py-1.5 text-xs font-semibold transition-colors',
+                          entry.type === 'CREDIT' ? 'bg-red-500/20 text-red-500' : 'text-muted-foreground hover:bg-accent'
+                        )}
                       >
                         Cr
                       </button>
@@ -234,75 +288,67 @@ export function VoucherForm({
                       value={entry.amount}
                       onChange={(e) => updateEntry(entry.id, 'amount', e.target.value)}
                       placeholder="0.00"
-                      className="w-full px-3 py-2.5 rounded-xl bg-foreground/5 border border-border/10 text-foreground font-mono text-sm text-right placeholder:text-foreground/20 focus:outline-none focus:border-teal/50 transition-all duration-200"
+                      className="w-full px-3 py-2 rounded-lg bg-background border border-border font-mono text-sm text-right focus:outline-none focus:border-primary/50 transition-all"
                     />
                   </div>
 
-                  {/* Remove */}
+                  {/* Delete */}
                   <div className="col-span-1 flex justify-center">
                     <button
                       onClick={() => removeEntry(entry.id)}
                       disabled={entries.length <= 2}
-                      className="p-1.5 rounded-lg text-foreground/20 hover:text-red-400 hover:bg-red-400/8 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Totals */}
-            <div className="mt-4 pt-4 border-t border-border/5 flex justify-end">
-              <div className="text-right space-y-1">
-                <div className="flex items-center gap-8 text-sm">
-                  <span className="text-foreground/40">Total Debits</span>
-                  <span className="font-mono font-semibold text-foreground w-32 text-right">{formatCurrency(totalDebits, currency)}</span>
+            {/* Totals Footer */}
+            <div className="bg-accent/40 border-t border-border px-4 py-3">
+              <div className="flex justify-end items-end flex-col gap-1.5 text-sm">
+                <div className="flex items-center gap-6 w-48 justify-between">
+                  <span className="text-muted-foreground">Total Dr</span>
+                  <span className="font-mono font-medium">{formatCurrency(totalDebits, currency)}</span>
                 </div>
-                <div className="flex items-center gap-8 text-sm">
-                  <span className="text-foreground/40">Total Credits</span>
-                  <span className="font-mono font-semibold text-foreground w-32 text-right">{formatCurrency(totalCredits, currency)}</span>
+                <div className="flex items-center gap-6 w-48 justify-between">
+                  <span className="text-muted-foreground">Total Cr</span>
+                  <span className="font-mono font-medium">{formatCurrency(totalCredits, currency)}</span>
                 </div>
-                <div className="flex items-center gap-8 text-sm pt-2 border-t border-border/5">
-                  <span className="text-foreground/40">Difference</span>
-                  <span className={`font-mono font-bold w-32 text-right ${isBalanced ? 'text-teal' : 'text-red-400'}`}>
+                <div className="flex items-center gap-6 w-48 justify-between pt-1.5 border-t border-border">
+                  <span className="text-muted-foreground font-medium">Difference</span>
+                  <span className={cn(
+                    'font-mono font-bold',
+                    isBalanced ? 'text-teal' : 'text-red-500'
+                  )}>
                     {formatCurrency(Math.abs(totalDebits - totalCredits), currency)}
                   </span>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Error */}
-          {error && (
-            <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-400/8 border border-red-400/20 text-sm text-red-400">
-              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-              {error}
-            </div>
-          )}
-
-          {/* Submit */}
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              onClick={handleSubmit}
-              disabled={isPending || !isBalanced || !hasAmounts}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all duration-200 shadow-glow disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isPending ? (
-                <div className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
-              ) : (
-                <Save size={15} />
-              )}
-              {isPending ? 'Saving…' : 'Save Voucher'}
-            </button>
-            <button
-              onClick={() => router.back()}
-              className="px-6 py-3 rounded-xl border border-border/10 text-foreground/60 hover:text-foreground hover:border-border/20 text-sm font-medium transition-all duration-200"
-            >
-              Cancel
-            </button>
-          </div>
         </div>
+      </div>
+
+      {/* Form Footer */}
+      <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3 bg-card">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-accent text-sm font-medium transition-all"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={isPending || success || !isBalanced || !hasAmounts}
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all shadow-glow disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          {isPending ? 'Saving…' : 'Save Voucher'}
+        </button>
       </div>
     </div>
   )
