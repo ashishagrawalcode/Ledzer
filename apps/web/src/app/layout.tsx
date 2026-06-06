@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { Providers } from './providers'
 import { OfflineBanner } from '@/components/offlineBanner'
+import { SyncProvider } from '@/components/syncProvider';
 
 export const metadata: Metadata = {
   title: {
@@ -59,7 +60,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <OfflineBanner />
-        <Providers>{children}</Providers>
+        <SyncProvider>
+          <Providers>{children}</Providers>
+        </SyncProvider>
       </body>
     </html>
   )

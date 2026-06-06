@@ -8,6 +8,9 @@ import { formatDate, formatCurrency, getVoucherPrefix, debounce } from '@/lib/ut
 import { StatusBadge, getVoucherStatusVariant, getVoucherTypeLabel } from '@/components/shared/StatusBadge'
 import { usePreferencesStore } from '@/store/usePreferencesStore'
 import { DataTable } from '@/components/shared/DataTable'
+import { usePendingItems } from '@/hooks/usePendingItems';
+import { toast } from 'sonner'
+import { processSyncQueue } from '@/lib/syncManager';
 
 interface VoucherRow {
   id: string
@@ -40,6 +43,8 @@ export function TransactionsList({
   const terminologyMode = usePreferencesStore((s) => s.terminologyMode)
   const isSimple = terminologyMode === 'simple'
 
+  const pendingItems = usePendingItems();
+
   const totalPages = Math.ceil(total / pageSize)
 
   const pushSearch = useCallback(
@@ -58,6 +63,13 @@ export function TransactionsList({
     pushSearch(e.target.value)
   }
 
+const handleManualSync = async () => {
+  toast.loading("Syncing pending items...");
+  await processSyncQueue();
+  toast.success("Sync complete! Refreshing...");
+  router.refresh(); // Refresh the list from the database
+};
+
   function goPage(p: number) {
     startTransition(() => {
       const params = new URLSearchParams()
@@ -72,12 +84,16 @@ export function TransactionsList({
       key: 'number',
       header: '#',
       className: 'font-mono text-xs text-foreground/50 w-28',
-      render: (row: VoucherRow) => (
-        <Link href={`${baseHref}/${row.id}`} className="hover:text-teal transition-colors duration-150 flex items-center gap-1 group">
-          <span className="font-mono text-xs">{row.number}</span>
-          <ExternalLink size={10} className="opacity-0 group-hover:opacity-60 transition-opacity" />
-        </Link>
-      ),
+      render: (row: VoucherRow) => {
+        const isPending = pendingItems.some(p => p.data.number === row.number);
+        return (
+          <Link href={`${baseHref}/${row.id}`} className="hover:text-teal transition-colors duration-150 flex items-center gap-1 group">
+            <span className="font-mono text-xs">{row.number}</span>
+            {isPending && <span className="text-[10px] bg-amber-500/10 text-amber-600 px-1.5 rounded-full animate-pulse">Syncing...</span>}
+            <ExternalLink size={10} className="opacity-0 group-hover:opacity-60 transition-opacity" />
+          </Link>
+        );
+      },
     },
     {
       key: 'date',
@@ -146,6 +162,14 @@ export function TransactionsList({
           {total} result{total !== 1 ? 's' : ''}
         </div>
       </div>
+
+      
+  <button 
+  onClick={handleManualSync}
+  className="px-3 py-2 text-xs bg-accent rounded-lg hover:bg-accent/80"
+>
+  Force Sync Queue
+</button>
 
       {/* Table */}
       <DataTable

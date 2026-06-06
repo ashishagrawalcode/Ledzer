@@ -10,6 +10,7 @@ import {
 import { formatCurrency } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { createVoucher } from '@/actions/vouchers'
+import { useOfflineAction } from '@/hooks/useOfflineAction'
 
 interface Party { id: string; name: string; type: string; ledgerId: string }
 interface Ledger { id: string; name: string; group: string; isSystem: boolean }
@@ -95,38 +96,49 @@ export function VoucherForm({
   const isBalanced = Math.abs(totalDebits - totalCredits) < 0.01
   const hasAmounts = totalDebits > 0
 
+  const { execute, isSyncing } = useOfflineAction();
+
   async function handleSubmit() {
-    setError(null)
-    if (!isBalanced) { setError('Debits must equal Credits for a valid double-entry voucher.'); return }
-    if (!hasAmounts) { setError('Please enter at least one valid amount.'); return }
-    if (entries.some((e) => !e.ledgerId)) { setError('Please select a ledger for all entries.'); return }
+  setError(null);
+  
+  // 1. Validation Logic
+  if (!isBalanced) { setError('Debits must equal Credits.'); return; }
+  if (!hasAmounts) { setError('Please enter at least one valid amount.'); return; }
+  if (entries.some((e) => !e.ledgerId)) { setError('Please select a ledger.'); return; }
 
-    startTransition(async () => {
-      const result = await createVoucher({
-        businessId,
-        type: voucherType,
-        // number: form.number.trim() || undefined,
-        date: new Date(form.date),
-        notes: form.notes.trim() || undefined,
-        entries: entries.map((e) => ({
-          ledgerId: e.ledgerId,
-          type: e.type as 'DEBIT' | 'CREDIT',
-          amount: parseFloat(e.amount) || 0,
-        })),
-      })
+  // 2. Prepare the payload
+  const voucherData = {
+    businessId,
+    type: voucherType,
+    date: new Date(form.date),
+    notes: form.notes.trim() || undefined,
+    entries: entries.map((e) => ({
+      ledgerId: e.ledgerId,
+      type: e.type as 'DEBIT' | 'CREDIT',
+      amount: parseFloat(e.amount) || 0,
+    })),
+  };
 
-      if (result.error) { 
-        setError(result.error)
-        return 
-      }
+  // 3. Execute via the Offline-Aware Hook
+  startTransition(async () => {
+    const result = await execute(voucherType, voucherData, createVoucher);
+
+    if (result?.error) {
+      setError(result.error);
+    } else {
+      setSuccess(true);
       
-      setSuccess(true)
-      setTimeout(() => {
-        router.push(returnHref)
-        router.refresh()
-      }, 1200)
-    })
-  }
+      if (!result.offline) {
+        setTimeout(() => {
+          router.push(returnHref);
+          router.refresh();
+        }, 1200);
+      } else {
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    }
+  });
+}
 
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -343,11 +355,11 @@ export function VoucherForm({
         </button>
         <button
           onClick={handleSubmit}
-          disabled={isPending || success || !isBalanced || !hasAmounts}
+          disabled={isPending || isSyncing || success || !isBalanced || !hasAmounts}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all shadow-glow disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-          {isPending ? 'Saving…' : 'Save Voucher'}
+          {isPending || isSyncing ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          {isPending || isSyncing ? 'Processing…' : 'Save Voucher'}
         </button>
       </div>
     </div>

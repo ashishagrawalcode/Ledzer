@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createReceiptPayment } from '@/actions/receiptPayment'
+import { useOfflineAction } from '@/hooks/useOfflineAction'
 
 type Mode = 'RECEIPT' | 'PAYMENT'
 
@@ -62,31 +63,39 @@ export function ReceiptPaymentForm({
       setForm((f) => ({ ...f, [key]: e.target.value }))
   }
 
-  function handleSubmit() {
+  const { execute, isSyncing } = useOfflineAction();
+  async function handleSubmit() {
     if (!form.partyLedgerId && payeeType === 'PARTY') { setError('Please select a party.'); return }
     if (!form.bankCashLedgerId) { setError('Please select a cash/bank account.'); return }
     if (!form.amount || parseFloat(form.amount) <= 0) { setError('Please enter a valid amount.'); return }
 
-    setError(null)
+    setError(null);
+    const data = {
+      type: mode,
+      number: form.number.trim(),
+      date: form.date,
+      partyLedgerId: payeeType === 'PARTY' ? form.partyLedgerId : null,
+      expenseLedgerId: payeeType === 'EXPENSE' ? form.partyLedgerId : null,
+      bankCashLedgerId: form.bankCashLedgerId,
+      amount: parseFloat(form.amount),
+      notes: form.notes.trim() || null,
+      paymentMode: form.paymentMode,
+    };
+
     startTransition(async () => {
-      const res = await createReceiptPayment({
-        type: mode,
-        number: form.number.trim(),
-        date: form.date,
-        partyLedgerId: payeeType === 'PARTY' ? form.partyLedgerId : null,
-        expenseLedgerId: payeeType === 'EXPENSE' ? form.partyLedgerId : null,
-        bankCashLedgerId: form.bankCashLedgerId,
-        amount: parseFloat(form.amount),
-        notes: form.notes.trim() || null,
-        paymentMode: form.paymentMode,
-      })
-      if (res.success) {
-        setSuccess(true)
-        setTimeout(() => router.push(isReceipt ? '/transactions/receipts' : '/transactions/payments'), 1200)
+      const res = await execute(mode, data, createReceiptPayment);
+      
+      if (res?.error) {
+        setError(res.error);
       } else {
-        setError(res.error ?? 'Something went wrong.')
+        setSuccess(true);
+        if (!res.offline) {
+          setTimeout(() => router.push(isReceipt ? '/transactions/receipts' : '/transactions/payments'), 1200);
+        } else {
+          setTimeout(() => setSuccess(false), 3000); // Reset UI after 3s
+        }
       }
-    })
+    });
   }
 
   const currSymbol = { INR: '₹', USD: '$', EUR: '€', GBP: '£' }[currency] ?? currency
