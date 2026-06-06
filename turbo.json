@@ -5,7 +5,9 @@
     "NEXTAUTH_URL",
     "GOOGLE_CLIENT_ID",
     "GOOGLE_CLIENT_SECRET",
-    "PRISMA_CLI_BINARY_TARGETS"
+    "PRISMA_CLI_BINARY_TARGETS",
+    "AUTH_TRUST_HOST",
+    "AUTH_URL"
   ],
   "tasks": {
     "build": {

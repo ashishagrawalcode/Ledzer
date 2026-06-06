@@ -9,13 +9,20 @@ import {
   BarChart3, Settings, LogOut, ChevronDown, Search,
   BookOpen, Receipt, CreditCard, ArrowRightLeft, Layers,
   User, Building2, X, ArrowRight, Loader2, Plus,
-  Hash, TrendingUp, Scale, CalendarDays, Wallet,
+  Hash, TrendingUp, Scale, CalendarDays, Wallet, Download
 } from 'lucide-react'
 import { usePreferencesStore } from '@/store/usePreferencesStore'
 import { getDictionary } from '@/lib/dictionary'
 import { getInitials, cn } from '@/lib/utils'
 import { globalSearch, type SearchResult } from '@/actions/globalSearch'
 import type { Session } from 'next-auth'
+import { useTerms } from '@/hooks/useTerms'
+
+declare global {
+  interface Window {
+    deferredPrompt: any;
+  }
+}
 
 interface AppNavbarProps {
   session: Session
@@ -90,7 +97,6 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
       ).slice(0, 5)
     : []
 
-  // Flat combined list for keyboard nav
   const pageItems = matchedPages.map(p => ({ label: p.label, href: p.href, sub: 'Page', type: 'Page' as const, icon: p.icon }))
   const allItems = [...pageItems, ...dbResults]
 
@@ -143,7 +149,6 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
         style={{ animation: 'scaleIn 0.14s cubic-bezier(0.32,0.72,0,1)' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Input row */}
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border">
           {isPending
             ? <Loader2 size={15} className="text-muted-foreground animate-spin flex-shrink-0" />
@@ -169,10 +174,7 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
           </kbd>
         </div>
 
-        {/* Body */}
         <div className="max-h-[400px] overflow-y-auto overscroll-contain">
-
-          {/* Empty state — quick nav */}
           {isEmpty && (
             <div className="p-2">
               <p className="px-3 pt-2 pb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -200,7 +202,6 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {/* No results */}
           {noResults && (
             <div className="py-12 text-center px-4">
               <p className="text-sm text-muted-foreground/60">
@@ -210,10 +211,8 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {/* Results */}
           {!isEmpty && !noResults && allItems.length > 0 && (
             <div className="p-2 space-y-1">
-              {/* Page matches */}
               {pageItems.length > 0 && (
                 <div>
                   <p className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Pages</p>
@@ -245,7 +244,6 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
                 </div>
               )}
 
-              {/* DB results grouped */}
               {Object.entries(grouped).map(([type, items]) => {
                 const cfg = RESULT_CONFIG[type] ?? RESULT_CONFIG.Page
                 const TypeIcon = cfg.icon
@@ -288,7 +286,6 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {/* Footer */}
         <div className="px-4 py-2 border-t border-border bg-accent/20 flex items-center justify-between text-[10px] text-muted-foreground/40">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
@@ -313,6 +310,78 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
         }
       `}</style>
     </div>
+  )
+}
+
+// ─── Dropdown Install Item ───────────────────────────────────────────────────
+function InstallMenuItem({ onClose }: { onClose: () => void }) {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [isInstallable, setIsInstallable] = useState(false)
+
+  useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches) return
+
+    if (window.deferredPrompt) {
+      setDeferredPrompt(window.deferredPrompt)
+      setIsInstallable(true)
+    }
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      window.deferredPrompt = e
+      setDeferredPrompt(e)
+      setIsInstallable(true)
+    }
+
+    const handleAppInstalled = () => {
+      setIsInstallable(false)
+      setDeferredPrompt(null)
+      window.deferredPrompt = null
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+
+    const checkInterval = setInterval(() => {
+      if (window.deferredPrompt) {
+        setDeferredPrompt(window.deferredPrompt)
+        setIsInstallable(true)
+        clearInterval(checkInterval)
+      }
+    }, 500)
+    setTimeout(() => clearInterval(checkInterval), 2500)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+      clearInterval(checkInterval)
+    }
+  }, [])
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return
+    deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    if (outcome === 'accepted') {
+      setIsInstallable(false)
+      window.deferredPrompt = null
+    }
+    setDeferredPrompt(null)
+    onClose()
+  }
+
+  if (!isInstallable) return null
+
+  return (
+    <>
+      <button
+        onClick={handleInstallClick}
+        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-teal hover:bg-teal/10 transition-all duration-100"
+      >
+        <Download size={14} />Install App
+      </button>
+      <div className="my-1 h-px bg-border" />
+    </>
   )
 }
 
@@ -363,6 +432,10 @@ function UserDropdown({ session, userInitials }: { session: Session; userInitial
               </div>
             </div>
             <div className="p-1.5">
+              
+              {/* Dropdown Install Button Injected Here */}
+              <InstallMenuItem onClose={() => setOpen(false)} />
+
               <Link href="/settings" onClick={() => setOpen(false)}
                 className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-100"
               >
@@ -435,14 +508,12 @@ function NavDropdown({
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
         >
-          {/* Header */}
           <div className="px-3.5 py-2.5 border-b border-border">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
               {item.label}
             </p>
           </div>
 
-          {/* Items */}
           <div className="p-1.5">
             {item.children!.map(child => {
               const ChildIcon = child.icon
@@ -479,7 +550,6 @@ function NavDropdown({
                     )}
                   </Link>
 
-                  {/* "+ New" pill — slides in on row hover */}
                   {child.newHref && (
                     <Link
                       href={child.newHref}
@@ -512,9 +582,6 @@ function NavDropdown({
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export function AppNavbar({ session, businessName }: AppNavbarProps) {
   const pathname = usePathname()
-  const terminologyMode = usePreferencesStore(s => s.terminologyMode)
-  const dict = getDictionary(terminologyMode)
-
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [pinned, setPinned] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -522,7 +589,6 @@ export function AppNavbar({ session, businessName }: AppNavbarProps) {
   const navRef = useRef<HTMLElement>(null)
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ⌘K shortcut
   useEffect(() => {
     function handle(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -534,14 +600,12 @@ export function AppNavbar({ session, businessName }: AppNavbarProps) {
     return () => document.removeEventListener('keydown', handle)
   }, [])
 
-  // Close on route change
   useEffect(() => {
     setOpenDropdown(null)
     setPinned(false)
     setSearchOpen(false)
   }, [pathname])
 
-  // Outside click closes everything
   useEffect(() => {
     function handle(e: MouseEvent) {
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
@@ -556,21 +620,18 @@ export function AppNavbar({ session, businessName }: AppNavbarProps) {
   const handleMouseEnter = (label: string) => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
     setOpenDropdown(label)
-    // Don't change pin state on hover — hover shouldn't override a click-pin
   }
 
   const handleMouseLeave = () => {
-    if (pinned) return  // clicked open — keep it
+    if (pinned) return
     hoverTimer.current = setTimeout(() => setOpenDropdown(null), 130)
   }
 
   const handleClick = (label: string) => {
     if (openDropdown === label && pinned) {
-      // Already pinned → close
       setOpenDropdown(null)
       setPinned(false)
     } else {
-      // Open + pin
       setOpenDropdown(label)
       setPinned(true)
     }
@@ -581,73 +642,72 @@ export function AppNavbar({ session, businessName }: AppNavbarProps) {
     return item.children?.some(c => pathname === c.href || pathname.startsWith(c.href + '/')) ?? false
   }
 
+  const { t } = useTerms();
+  
   const NAV_ITEMS: NavItem[] = [
-    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: t('dashboard'), href: '/dashboard', icon: LayoutDashboard },
     {
-      label: dict.transactions ?? 'Transactions',
+      label: t('transactions'),
       icon: ArrowRightLeft,
       children: [
-        { label: 'Sales Invoices', href: '/transactions/sales',     icon: FileText,       description: 'Create & manage sales vouchers',   newHref: '/transactions/sales/new',     newLabel: 'New Invoice'  },
-        { label: 'Purchase Bills', href: '/transactions/purchases', icon: ShoppingCart,   description: 'Record purchase vouchers',          newHref: '/transactions/purchases/new', newLabel: 'New Purchase' },
-        { label: 'Receipts',       href: '/transactions/receipts',  icon: Receipt,        description: 'Payments received from customers',  newHref: '/transactions/receipts/new',  newLabel: 'New Receipt'  },
-        { label: 'Payments',       href: '/transactions/payments',  icon: CreditCard,     description: 'Payments made to suppliers',        newHref: '/transactions/payments/new',  newLabel: 'New Payment'  },
-        { label: 'Journals',       href: '/transactions/journals',  icon: BookOpen,       description: 'Manual adjustment entries',         newHref: '/transactions/journals/new',  newLabel: 'New Journal'  },
-        { label: 'Contra',         href: '/transactions/contra',    icon: ArrowRightLeft, description: 'Cash & bank transfers',             newHref: '/transactions/contra/new',    newLabel: 'New Contra'   },
+        { label: t('salesInvoices'), href: '/transactions/sales', icon: FileText, description: t('descSales'), newHref: '/transactions/sales/new', newLabel: t('newInvoice') },
+        { label: t('purchaseBills'), href: '/transactions/purchases', icon: ShoppingCart, description: t('descPurchase'), newHref: '/transactions/purchases/new', newLabel: t('newPurchase') },
+        { label: t('receipts'), href: '/transactions/receipts', icon: Receipt, description: t('descReceipts'), newHref: '/transactions/receipts/new', newLabel: t('newReceipt') },
+        { label: t('payments'), href: '/transactions/payments', icon: CreditCard, description: t('descPayments'), newHref: '/transactions/payments/new', newLabel: t('newPayment') },
+        { label: t('journals'), href: '/transactions/journals', icon: BookOpen, description: t('descJournals'), newHref: '/transactions/journals/new', newLabel: t('newJournal') },
+        { label: t('contra'), href: '/transactions/contra', icon: ArrowRightLeft, description: t('descContra'), newHref: '/transactions/contra/new', newLabel: t('newContra') },
       ],
     },
     {
-      label: dict.invoices ?? 'Invoices', // Uncommented and active
-      href: '/invoices',     // Pointing to your invoice list
+      label: t('invoices'), 
+      href: '/invoices',
       icon: FileText,
     },
     {
-      label: dict.masters ?? 'Masters',
+      label: t('masters'),
       icon: Layers,
       children: [
-        { label: 'Ledgers',       href: '/masters/ledgers',       icon: BookOpen, description: 'Chart of accounts',           newHref: '/masters/ledgers/new', newLabel: 'New Ledger' },
-        { label: 'Groups',        href: '/masters/groups',        icon: Layers,   description: 'Account group management'    },
-        { label: 'Voucher Types', href: '/masters/voucher-types', icon: FileText, description: 'Custom voucher configuration' },
+        { label: t('ledgers'), href: '/masters/ledgers', icon: BookOpen, description: t('descLedgers'), newHref: '/masters/ledgers/new', newLabel: t('newLedger') },
+        { label: t('groups'), href: '/masters/groups', icon: Layers, description: t('descGroups') },
+        { label: t('voucherTypes'), href: '/masters/voucher-types', icon: FileText, description: t('descVoucherTypes') },
       ],
     },
     {
-      label: dict.parties ?? 'Parties',
+      label: t('parties'),
       icon: Users,
       children: [
-        { label: 'Customers', href: '/parties/customers', icon: User,      description: 'People who owe you money', newHref: '/parties/customers/new', newLabel: 'New Customer' },
-        { label: 'Suppliers', href: '/parties/suppliers', icon: Building2, description: 'People you owe money to',  newHref: '/parties/suppliers/new', newLabel: 'New Supplier' },
+        { label: t('customers'), href: '/parties/customers', icon: User, description: t('descCustomers'), newHref: '/parties/customers/new', newLabel: t('newCustomer') },
+        { label: t('suppliers'), href: '/parties/suppliers', icon: Building2, description: t('descSuppliers'), newHref: '/parties/suppliers/new', newLabel: t('newSupplier') },
       ],
     },
-    { label: dict.inventory ?? 'Inventory', href: '/inventory', icon: Package },
+    { label: t('inventory'), href: '/inventory', icon: Package },
     {
-      label: dict.reports ?? 'Reports',
+      label: t('reports'),
       icon: BarChart3,
       children: [
-        { label: 'Profit & Loss', href: '/reports/pnl',           icon: BarChart3,      description: 'Income and expense summary'   },
-        { label: 'Balance Sheet', href: '/reports/balance-sheet', icon: Layers,         description: 'Assets and liabilities'       },
-        { label: 'Day Book',      href: '/reports/daybook',       icon: BookOpen,       description: 'All transactions for a day'   },
-        { label: 'Cash Flow',     href: '/reports/cashflow',      icon: ArrowRightLeft, description: 'Money movement overview'      },
-        { label: 'Party Ledger',  href: '/reports/party-ledger',  icon: Users,          description: 'Individual party statements'  },
+        { label: t('profitAndLoss'), href: '/reports/pnl', icon: BarChart3, description: t('descPnL') },
+        { label: t('balanceSheet'), href: '/reports/balance-sheet', icon: Scale, description: t('descBalanceSheet') },
+        { label: t('dayBook'), href: '/reports/daybook', icon: BookOpen, description: t('descDayBook') },
+        { label: t('cashFlow'), href: '/reports/cashflow', icon: Wallet, description: t('descCashFlow') },
+        { label: t('partyLedger'), href: '/reports/party-ledger', icon: Users, description: t('descPartyLedger') },
       ],
     },
-  ]
+  ];
 
   const userInitials = getInitials(session.user?.name)
 
   return (
     <>
       <nav ref={navRef} className="fixed top-0 left-0 right-0 z-50 h-14">
-        {/* Glass background */}
         <div className="absolute inset-0 bg-background/85 backdrop-blur-xl border-b border-border" />
 
         <div className="relative w-full h-full flex items-center px-4 lg:px-6 gap-1">
 
-          {/* Logo — visible on all sizes */}
           <Link href="/dashboard" className="flex items-center gap-2 mr-2 group flex-shrink-0">
             <div className="w-7 h-7 rounded-lg bg-teal-gradient flex items-center justify-center shadow-glow-sm group-hover:shadow-glow transition-all duration-300">
               <span className="font-display font-bold text-navy-DEFAULT text-xs">L</span>
             </div>
             <span className="font-display font-bold text-sm text-foreground tracking-tight">Ledzer</span>
-            {/* Business name: inline on desktop, hidden on sm */}
             {businessName && (
               <span className="hidden md:block text-[10px] text-muted-foreground leading-none truncate max-w-[100px]">
                 · {businessName}
@@ -655,17 +715,14 @@ export function AppNavbar({ session, businessName }: AppNavbarProps) {
             )}
           </Link>
 
-          {/* Business name pill on mobile (sm only) */}
           {businessName && (
             <span className="md:hidden text-[10px] text-muted-foreground bg-accent border border-border px-2 py-0.5 rounded-full truncate max-w-[80px] flex-shrink-0">
               {businessName}
             </span>
           )}
 
-          {/* Divider */}
           <div className="hidden lg:block w-px h-4 bg-border mx-1.5 flex-shrink-0" />
 
-          {/* Desktop nav */}
           <div className="hidden lg:flex items-center gap-0.5 flex-1 overflow-visible">
             {NAV_ITEMS.map(item => {
               const Icon = item.icon
@@ -705,9 +762,7 @@ export function AppNavbar({ session, businessName }: AppNavbarProps) {
             })}
           </div>
 
-          {/* Right controls */}
           <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
-            {/* Search — desktop */}
             <button
               onClick={() => setSearchOpen(true)}
               className="hidden sm:flex items-center gap-2 h-8 px-3 rounded-lg bg-accent border border-border text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-all duration-100 text-xs group"
@@ -722,7 +777,6 @@ export function AppNavbar({ session, businessName }: AppNavbarProps) {
               </div>
             </button>
 
-            {/* Search — mobile icon */}
             <button
               onClick={() => setSearchOpen(true)}
               className="sm:hidden w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-100"

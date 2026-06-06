@@ -43,6 +43,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
+        
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.deferredPrompt = null;
+              window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                window.deferredPrompt = e;
+              });
+            `,
+          }}
+        />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <Providers>{children}</Providers>

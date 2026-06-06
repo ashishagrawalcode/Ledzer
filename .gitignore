@@ -38,3 +38,9 @@ yarn-test.log*
 
 .turbo
 .turbo/
+
+# PWA files
+**/public/sw.js
+**/public/swe-worker-*.js
+**/public/workbox-*.js
+**/public/fallback-*.js

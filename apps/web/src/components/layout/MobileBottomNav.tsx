@@ -4,55 +4,58 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, FileText, Users, BarChart3, MoreHorizontal, Package, ArrowRightLeft, ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
-
-// Centralized Dictionary for all nested menus
-const SUB_MENUS: Record<string, { label: string; href: string; icon: any }[]> = {
-  Transactions: [
-    { label: 'Sales', href: '/transactions/sales', icon: ArrowRightLeft },
-    { label: 'Purchases', href: '/transactions/purchases', icon: ArrowRightLeft },
-    { label: 'Payments', href: '/transactions/payments', icon: ArrowRightLeft },
-    { label: 'Receipts', href: '/transactions/receipts', icon: ArrowRightLeft },
-    { label: 'Journals', href: '/transactions/journals', icon: ArrowRightLeft },
-    { label: 'Contra', href: '/transactions/contra', icon: ArrowRightLeft },
-  ],
-  Parties: [
-    { label: 'Customers', href: '/parties/customers', icon: Users },
-    { label: 'Suppliers', href: '/parties/suppliers', icon: Users },
-  ],
-  Reports: [
-    { label: 'P&L', href: '/reports/pnl', icon: BarChart3 },
-    { label: 'Balance Sheet', href: '/reports/balance-sheet', icon: BarChart3 },
-    { label: 'Cash Flow', href: '/reports/cash-flow', icon: BarChart3 },
-    { label: 'Daybook', href: '/reports/daybook', icon: BarChart3 },
-    { label: 'Party Ledger', href: '/reports/party-ledger', icon: BarChart3 },
-  ],
-  Masters: [
-    { label: 'Ledgers', href: '/masters/ledgers', icon: FileText },
-    { label: 'Groups', href: '/masters/groups', icon: FileText },
-    { label: 'Voucher Types', href: '/masters/voucher-types', icon: FileText },
-  ],
-}
-
-// Transactions replaced Invoices in the main bar
-const MOBILE_NAV = [
-  { label: 'Transactions', href: '/transactions/sales', icon: ArrowRightLeft },
-  { label: 'Parties', href: '/parties/customers', icon: Users },
-  { spacer: true }, // Spacer for the center Dashboard button
-  { label: 'Reports', href: '/reports/pnl', icon: BarChart3 },
-  { label: 'More', href: null, icon: MoreHorizontal },
-]
-
-// Invoices moved to the More drawer
-const MORE_ITEMS = [
-  { label: 'Invoices', href: '/invoices', icon: FileText },
-  { label: 'Inventory', href: '/inventory', icon: Package },
-  { label: 'Masters', basePath: '/masters', icon: FileText }, // Uses sub-menu dict
-]
+import { useTerms } from '@/hooks/useTerms'
 
 export function MobileBottomNav() {
   const pathname = usePathname()
   const [moreOpen, setMoreOpen] = useState(false)
   const [subMenu, setSubMenu] = useState<string | null>(null)
+
+  const { t } = useTerms()
+
+  // Centralized Dictionary for all nested menus
+  const SUB_MENUS: Record<string, { label: string; href: string; icon: any }[]> = {
+    Transactions: [
+      { label: t('salesInvoices'), href: '/transactions/sales', icon: ArrowRightLeft },
+      { label: t('purchaseBills'), href: '/transactions/purchases', icon: ArrowRightLeft },
+      { label: t('payments'), href: '/transactions/payments', icon: ArrowRightLeft },
+      { label: t('receipts'), href: '/transactions/receipts', icon: ArrowRightLeft },
+      { label: t('journals'), href: '/transactions/journals', icon: ArrowRightLeft },
+      { label: t('contra'), href: '/transactions/contra', icon: ArrowRightLeft },
+    ],
+    Parties: [
+      { label: t('customers'), href: '/parties/customers', icon: Users },
+      { label: t('suppliers'), href: '/parties/suppliers', icon: Users },
+    ],
+    Reports: [
+      { label: t('profitAndLoss'), href: '/reports/pnl', icon: BarChart3 },
+      { label: t('balanceSheet'), href: '/reports/balance-sheet', icon: BarChart3 },
+      { label: t('cashFlow'), href: '/reports/cash-flow', icon: BarChart3 },
+      { label: t('dayBook'), href: '/reports/daybook', icon: BarChart3 },
+      { label: t('partyLedger'), href: '/reports/party-ledger', icon: BarChart3 },
+    ],
+    Masters: [
+      { label: t('ledgers'), href: '/masters/ledgers', icon: FileText },
+      { label: t('groups'), href: '/masters/groups', icon: FileText },
+      { label: t('voucherTypes'), href: '/masters/voucher-types', icon: FileText },
+    ],
+  }
+
+  // Transactions replaced Invoices in the main bar
+  const MOBILE_NAV = [
+    { label: t('transactions'), href: '/transactions/sales', icon: ArrowRightLeft },
+    { label: t('parties'), href: '/parties/customers', icon: Users },
+    { spacer: true }, // Spacer for the center Dashboard button
+    { label: t('reports'), href: '/reports/pnl', icon: BarChart3 },
+    { label: t('more'), href: null, icon: MoreHorizontal },
+  ]
+
+  // Invoices moved to the More drawer
+  const MORE_ITEMS = [
+    { label: t('invoices'), href: '/invoices', icon: FileText },
+    { label: t('inventory'), href: '/inventory', icon: Package },
+    { label: t('masters'), basePath: '/masters', icon: FileText },
+  ]
 
   // Check if we are currently on the dashboard to highlight the center button differently
   const isDashboardActive = pathname === '/dashboard'
