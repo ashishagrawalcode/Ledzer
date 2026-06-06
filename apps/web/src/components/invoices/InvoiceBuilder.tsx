@@ -3,237 +3,369 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Trash2, FileText, CheckCircle2, Loader2, User, ExternalLink } from 'lucide-react'
+import {
+  Plus, Trash2, FileText, CheckCircle2, Loader2,
+  User, ExternalLink, ChevronDown, Tag,
+} from 'lucide-react'
 import { calculateTax } from '@/lib/taxEngine'
 import { createInvoice } from '@/actions/invoice'
+import { cn } from '@/lib/utils'
 
 interface InvoiceBuilderProps {
   businessId: string
   currency: string
-  parties: any[]
-  products: any[]
+  parties:  { id: string; name: string }[]
+  products: { id: string; name: string; salePrice: number | null }[]
 }
+
+const TAX_SLABS = [
+  { value: '0',      label: '0% — No Tax'        },
+  { value: '5',      label: '5%'                 },
+  { value: '12',     label: '12%'                },
+  { value: '18',     label: '18%'                },
+  { value: '28',     label: '28%'                },
+  { value: 'custom', label: 'Custom…'            },
+]
 
 export function InvoiceBuilder({ businessId, currency, parties, products }: InvoiceBuilderProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  
-  // Customer vs Walk-in State
-  const [partyId, setPartyId] = useState('cash')
+
+  const [partyId, setPartyId]       = useState('cash')
   const [walkInName, setWalkInName] = useState('')
-  
-  // Custom Tax State Logic
-  const [taxSelection, setTaxSelection] = useState<string>("0")
-  const [customTaxRate, setCustomTaxRate] = useState<number>(0)
-  
+  const [taxSelection, setTaxSelection] = useState('0')
+  const [customTaxRate, setCustomTaxRate] = useState(0)
   const [items, setItems] = useState([{ productId: '', description: '', qty: 1, price: 0 }])
 
-  const subtotal = useMemo(() => items.reduce((sum, item) => sum + ((item.qty || 0) * (item.price || 0)), 0), [items])
+  const subtotal      = useMemo(() => items.reduce((s, i) => s + (i.qty || 0) * (i.price || 0), 0), [items])
   const actualTaxRate = taxSelection === 'custom' ? customTaxRate : parseFloat(taxSelection) || 0
   const { totalTax, breakdown } = useMemo(() => calculateTax(subtotal, actualTaxRate), [subtotal, actualTaxRate])
   const netAmount = subtotal + totalTax
 
-  const handleProductSelect = (index: number, productId: string) => {
-    const product = products.find(p => p.id === productId)
-    if (product) {
-      const newItems = [...items]
-      newItems[index] = { 
-        ...newItems[index], 
-        productId: product.id, 
-        description: product.name, 
-        price: product.salePrice || 0 
-      }
-      setItems(newItems)
-    }
+  function selectProduct(index: number, productId: string) {
+    const p = products.find((x) => x.id === productId)
+    if (!p) return
+    const next = [...items]
+    next[index] = { ...next[index], productId: p.id, description: p.name, price: p.salePrice ?? 0 }
+    setItems(next)
   }
 
-  const updateItem = (index: number, field: string, value: string | number) => {
-    const newItems = [...items]
-    newItems[index] = { ...newItems[index], [field]: value }
-    setItems(newItems)
+  function updateItem(index: number, field: string, value: string | number) {
+    const next = [...items]
+    next[index] = { ...next[index], [field]: value }
+    setItems(next)
   }
 
-  const removeItem = (index: number) => {
+  function removeItem(index: number) {
     if (items.length > 1) setItems(items.filter((_, i) => i !== index))
   }
 
-  const handleSave = async () => {
+  async function handleSave() {
     if (netAmount <= 0) return alert('Invoice total must be greater than zero.')
-    
     setLoading(true)
-    const res = await createInvoice({ 
-      businessId, 
-      partyId: partyId === 'cash' ? undefined : partyId, 
+    const res = await createInvoice({
+      businessId,
+      partyId:    partyId === 'cash' ? undefined : partyId,
       walkInName: partyId === 'cash' ? walkInName : undefined,
-      items, taxRate: actualTaxRate, totalTax, netAmount 
+      items, taxRate: actualTaxRate, totalTax, netAmount,
     })
     setLoading(false)
-
-    if (res.success) {
-      router.push(`/transactions/sales/${res.id}`) 
-    } else {
-      alert(`Error: ${res.error}`)
-    }
+    if (res.success) router.push(`/transactions/sales/${res.id}`)
+    else alert(`Error: ${res.error}`)
   }
 
+  const currSym = { INR: '₹', USD: '$', EUR: '€', GBP: '£', NPR: 'Rs.', CAD: 'C$', AUD: 'A$', AED: 'د.إ', SGD: 'S$' }[currency] ?? currency
+
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
-      <div className="flex-1 bg-[#050505] border border-white/5 rounded-2xl p-6 shadow-2xl">
-        
-        {/* Customer Selection Logic */}
-        <div className="mb-8 flex gap-4">
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-xs font-semibold text-white/40 uppercase tracking-widest">Billing Account</label>
-              
-              {/* NEW: Quick Add Customer Link */}
-              <Link 
-                href="/parties/customers/new" 
-                target="_blank" 
-                className="flex items-center gap-1 text-[11px] font-medium text-teal hover:text-teal-hover transition-colors"
-              >
-                <Plus size={12} /> New Customer <ExternalLink size={10} className="opacity-50" />
-              </Link>
-            </div>
-            
-            <select 
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl p-3.5 text-white text-sm outline-none focus:border-teal/50"
-              value={partyId} onChange={(e) => setPartyId(e.target.value)}
+    /* Stack vertically on mobile, side-by-side on large screens */
+    <div className="flex flex-col lg:flex-row gap-5">
+
+      {/* ── LEFT: Form panel ─────────────────────────────────────────────── */}
+      <div className="flex-1 bg-card border border-border rounded-2xl overflow-hidden">
+
+        {/* Customer row */}
+        <div className="p-5 border-b border-border space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Bill To
+            </label>
+            <Link
+              href="/parties/customers/new"
+              target="_blank"
+              className="flex items-center gap-1 text-[11px] font-medium text-primary hover:opacity-80 transition-opacity"
             >
-              <option value="cash" className="bg-[#0a0a0a]">Walk-in / Cash Sale (Default)</option>
-              <optgroup label="Registered Customers" className="bg-[#0a0a0a]">
-                {parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </optgroup>
-            </select>
+              <Plus size={11} />New Customer<ExternalLink size={10} className="opacity-50" />
+            </Link>
           </div>
 
-          {/* Walk-in Name Input */}
-          {partyId === 'cash' && (
-            <div className="flex-1 animate-in fade-in slide-in-from-right-4">
-              <label className="block text-xs font-semibold text-white/40 mb-3 uppercase tracking-widest flex items-center gap-1"><User size={12}/> Print Name on Bill</label>
-              <input 
-                type="text" placeholder="e.g. Ashish Agrawal (Optional)" 
-                className="w-full bg-white/[0.03] border border-white/10 rounded-xl p-3.5 text-white text-sm outline-none focus:border-teal/50"
-                value={walkInName} onChange={(e) => setWalkInName(e.target.value)}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Dynamic Line Items with Inventory Sync */}
-        <div className="space-y-3">
-          <div className="grid grid-cols-12 gap-4 text-[10px] font-bold text-white/30 uppercase tracking-widest px-2 pb-2 border-b border-white/5">
-            <div className="col-span-6 flex items-center justify-between">
-              <span>Item / Product</span>
-              
-              {/* NEW: Quick Add Inventory Link */}
-              <Link 
-                href="/inventory" 
-                target="_blank" 
-                className="flex items-center gap-1 text-teal hover:text-teal-hover transition-colors normal-case tracking-normal text-[11px] font-medium"
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <select
+                value={partyId}
+                onChange={(e) => setPartyId(e.target.value)}
+                className="w-full appearance-none px-4 py-3 pr-8 rounded-xl bg-accent border border-border text-foreground text-sm focus:outline-none focus:border-primary/50 transition-all"
               >
-                <Plus size={12} /> New Product <ExternalLink size={10} className="opacity-50" />
-              </Link>
-            </div>
-            <div className="col-span-2 text-center">Qty</div>
-            <div className="col-span-3 text-right">Price</div>
-            <div className="col-span-1"></div>
-          </div>
-
-          {items.map((item, index) => (
-            <div key={index} className="grid grid-cols-12 gap-4 items-center bg-white/[0.02] p-2 rounded-xl border border-white/5">
-              <div className="col-span-6 flex gap-2">
-                {/* Inventory Dropdown */}
-                <select 
-                  className="w-1/3 bg-black/50 border border-white/5 rounded-lg p-2 text-xs text-white outline-none focus:border-teal/50"
-                  onChange={(e) => handleProductSelect(index, e.target.value)}
-                  value={item.productId || ""}
-                >
-                  <option value="" disabled>Inventory...</option>
-                  {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-                {/* Manual Description Fallback */}
-                <input type="text" placeholder="Description" className="w-2/3 bg-transparent text-sm text-white outline-none px-2"
-                  value={item.description} onChange={(e) => updateItem(index, 'description', e.target.value)} />
-              </div>
-              <div className="col-span-2">
-                <input type="number" min="1" className="w-full bg-black/50 border border-white/5 rounded-lg p-2 text-center text-sm text-white outline-none"
-                  value={item.qty || ''} onChange={(e) => updateItem(index, 'qty', parseFloat(e.target.value) || 0)} />
-              </div>
-              <div className="col-span-3">
-                <input type="number" className="w-full bg-black/50 border border-white/5 rounded-lg p-2 text-right text-sm text-white outline-none"
-                  value={item.price || ''} onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)} />
-              </div>
-              <div className="col-span-1 flex justify-end pr-2">
-                <button onClick={() => removeItem(index)} className="text-white/20 hover:text-red-400"><Trash2 size={16} /></button>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button onClick={() => setItems([...items, { productId: '', description: '', qty: 1, price: 0 }])} className="mt-4 flex items-center gap-2 text-xs font-semibold text-teal bg-teal/10 px-4 py-2 rounded-lg hover:bg-teal/20">
-          <Plus size={14} /> Add Line Item
-        </button>
-      </div>
-
-      {/* RIGHT: Live Sidebar */}
-      <div className="w-full lg:w-[340px] bg-[#050505] border border-white/5 rounded-2xl p-6 shadow-2xl h-fit lg:sticky lg:top-24">
-        <h3 className="text-sm font-semibold text-white mb-6 flex items-center gap-2">
-          <FileText size={16} className="text-teal" /> Live Summary
-        </h3>
-
-        <div className="space-y-4 text-sm">
-          <div className="flex justify-between text-white/60">
-            <span>Subtotal</span>
-            <span>{currency} {subtotal.toFixed(2)}</span>
-          </div>
-
-          <div className="flex flex-col gap-3 pb-4 border-b border-white/5">
-            <div className="flex items-center justify-between">
-              <span className="text-white/60">Tax Slab</span>
-              <select 
-                className="bg-white/5 border border-white/10 rounded-lg py-1.5 px-2 text-white outline-none text-right cursor-pointer text-xs focus:border-teal/50"
-                value={taxSelection} 
-                onChange={(e) => setTaxSelection(e.target.value)}
-              >
-                <option value="0" className="bg-[#0a0a0a]">0% - No Tax</option>
-                <option value="5" className="bg-[#0a0a0a]">5% Slab</option>
-                <option value="12" className="bg-[#0a0a0a]">12% Slab</option>
-                <option value="18" className="bg-[#0a0a0a]">18% Slab</option>
-                <option value="custom" className="bg-[#0a0a0a]">Custom...</option>
+                <option value="cash">Walk-in / Cash Sale</option>
+                {parties.length > 0 && (
+                  <optgroup label="Registered Customers">
+                    {parties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </optgroup>
+                )}
               </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             </div>
 
-            {taxSelection === 'custom' && (
-              <div className="flex items-center justify-between bg-white/[0.02] p-2 rounded-lg border border-white/5">
-                <span className="text-white/40 text-xs">Enter Rate (%)</span>
-                <input 
-                  type="number" min="0" step="0.1"
-                  className="w-20 bg-black border border-white/10 rounded p-1 text-right text-xs text-white outline-none focus:border-teal/50"
-                  value={customTaxRate || ''} onChange={(e) => setCustomTaxRate(parseFloat(e.target.value) || 0)}
+            {partyId === 'cash' && (
+              <div className="relative flex-1 animate-fade-up">
+                <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Print name on bill (optional)"
+                  value={walkInName}
+                  onChange={(e) => setWalkInName(e.target.value)}
+                  className="w-full pl-8 pr-4 py-3 rounded-xl bg-accent border border-border text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary/50 transition-all"
                 />
               </div>
             )}
           </div>
+        </div>
 
-          {breakdown.map((tax, i) => (
-            <div key={i} className="flex justify-between text-white/40 text-xs">
-              <span>{tax.label}</span>
-              <span>+ {currency} {tax.amount.toFixed(2)}</span>
+        {/* Line items */}
+        <div className="p-5 space-y-3">
+          {/* Desktop header (hidden on mobile) */}
+          <div className="hidden sm:grid sm:grid-cols-12 gap-3 px-1 pb-2 border-b border-border">
+            <div className="col-span-6 flex items-center justify-between">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Item / Product</span>
+              <Link href="/inventory" target="_blank" className="flex items-center gap-1 text-[11px] font-medium text-primary hover:opacity-80 transition-opacity">
+                <Plus size={11} />New Product<ExternalLink size={10} className="opacity-50" />
+              </Link>
+            </div>
+            <div className="col-span-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-center">Qty</div>
+            <div className="col-span-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right">Price</div>
+            <div className="col-span-1" />
+          </div>
+
+          {/* Mobile: show "New Product" link above items */}
+          <div className="flex sm:hidden items-center justify-between pb-1 border-b border-border">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Line Items</span>
+            <Link href="/inventory" target="_blank" className="flex items-center gap-1 text-[11px] font-medium text-primary">
+              <Plus size={11} />New Product
+            </Link>
+          </div>
+
+          {items.map((item, idx) => (
+            <div key={idx}>
+              {/* ── Desktop row (12-col grid) ── */}
+              <div className="hidden sm:grid sm:grid-cols-12 gap-3 items-center bg-accent/40 px-3 py-2.5 rounded-xl border border-border">
+                <div className="col-span-6 flex gap-2 min-w-0">
+                  <div className="relative w-[38%] flex-shrink-0">
+                    <select
+                      value={item.productId || ''}
+                      onChange={(e) => selectProduct(idx, e.target.value)}
+                      className="w-full appearance-none bg-accent border border-border rounded-lg py-2 px-2 pr-6 text-xs text-foreground focus:outline-none focus:border-primary/50"
+                    >
+                      <option value="" disabled>Pick…</option>
+                      {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                    <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Description"
+                    value={item.description}
+                    onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                    className="flex-1 min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none px-1"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <input
+                    type="number" min="1"
+                    value={item.qty || ''}
+                    onChange={(e) => updateItem(idx, 'qty', parseFloat(e.target.value) || 0)}
+                    className="w-full bg-accent border border-border rounded-lg py-2 px-2 text-center text-sm text-foreground focus:outline-none focus:border-primary/50"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">{currSym}</span>
+                    <input
+                      type="number"
+                      value={item.price || ''}
+                      onChange={(e) => updateItem(idx, 'price', parseFloat(e.target.value) || 0)}
+                      className="w-full bg-accent border border-border rounded-lg py-2 pl-5 pr-2 text-right text-sm text-foreground focus:outline-none focus:border-primary/50"
+                    />
+                  </div>
+                </div>
+                <div className="col-span-1 flex justify-center">
+                  <button
+                    onClick={() => removeItem(idx)}
+                    disabled={items.length === 1}
+                    className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 disabled:opacity-20 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Mobile card ── */}
+              <div className="sm:hidden bg-accent/40 rounded-xl border border-border p-3.5 space-y-3">
+                {/* Product + remove */}
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <select
+                      value={item.productId || ''}
+                      onChange={(e) => selectProduct(idx, e.target.value)}
+                      className="w-full appearance-none bg-accent border border-border rounded-xl py-2.5 px-3 pr-7 text-sm text-foreground focus:outline-none focus:border-primary/50"
+                    >
+                      <option value="" disabled>Pick from inventory…</option>
+                      {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                    <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  </div>
+                  <button
+                    onClick={() => removeItem(idx)}
+                    disabled={items.length === 1}
+                    className="p-2 rounded-xl border border-border text-muted-foreground/40 hover:text-destructive hover:border-destructive/30 disabled:opacity-20 transition-all"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+
+                {/* Description */}
+                <input
+                  type="text"
+                  placeholder="Description or item name"
+                  value={item.description}
+                  onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                  className="w-full bg-accent border border-border rounded-xl py-2.5 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
+                />
+
+                {/* Qty + Price on same row */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1.5">Quantity</p>
+                    <input
+                      type="number" min="1"
+                      value={item.qty || ''}
+                      onChange={(e) => updateItem(idx, 'qty', parseFloat(e.target.value) || 0)}
+                      className="w-full bg-accent border border-border rounded-xl py-2.5 px-3 text-sm text-center text-foreground focus:outline-none focus:border-primary/50"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1.5">Price / Unit</p>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">{currSym}</span>
+                      <input
+                        type="number"
+                        value={item.price || ''}
+                        onChange={(e) => updateItem(idx, 'price', parseFloat(e.target.value) || 0)}
+                        className="w-full bg-accent border border-border rounded-xl py-2.5 pl-6 pr-3 text-sm text-right text-foreground focus:outline-none focus:border-primary/50"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Line total */}
+                <div className="flex items-center justify-between pt-1 border-t border-border">
+                  <span className="text-xs text-muted-foreground">Line total</span>
+                  <span className="font-mono text-sm font-semibold text-foreground tabular-nums">
+                    {currSym}{((item.qty || 0) * (item.price || 0)).toFixed(2)}
+                  </span>
+                </div>
+              </div>
             </div>
           ))}
 
-          <div className="pt-2 flex justify-between items-center mt-4">
-            <span className="font-semibold text-white/80">Net Amount</span>
-            <span className="font-bold text-teal text-xl">{currency} {netAmount.toFixed(2)}</span>
+          <button
+            onClick={() => setItems([...items, { productId: '', description: '', qty: 1, price: 0 }])}
+            className="flex items-center gap-2 text-xs font-semibold text-primary bg-primary/8 hover:bg-primary/15 px-4 py-2.5 rounded-xl transition-all w-full sm:w-auto justify-center sm:justify-start border border-primary/20"
+          >
+            <Plus size={13} />Add Line Item
+          </button>
+        </div>
+      </div>
+
+      {/* ── RIGHT: Summary sidebar ────────────────────────────────────────── */}
+      <div className="w-full lg:w-[320px] bg-card border border-border rounded-2xl p-5 h-fit lg:sticky lg:top-20 space-y-5">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <FileText size={15} className="text-primary" />Live Summary
+        </h3>
+
+        {/* Subtotal */}
+        <div className="space-y-3 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Subtotal</span>
+            <span className="font-mono tabular-nums text-foreground">{currSym}{subtotal.toFixed(2)}</span>
           </div>
+
+          {/* Tax slab */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 text-muted-foreground flex-shrink-0">
+              <Tag size={13} />
+              <span>Tax Slab</span>
+            </div>
+            <div className="relative">
+              <select
+                value={taxSelection}
+                onChange={(e) => setTaxSelection(e.target.value)}
+                className="appearance-none bg-accent border border-border rounded-lg py-1.5 pl-2.5 pr-6 text-foreground text-xs focus:outline-none focus:border-primary/50 transition-all"
+              >
+                {TAX_SLABS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Custom rate input */}
+          {taxSelection === 'custom' && (
+            <div className="flex items-center justify-between bg-accent rounded-xl px-3 py-2.5 border border-border animate-fade-up">
+              <span className="text-xs text-muted-foreground">Custom rate (%)</span>
+              <input
+                type="number" min="0" step="0.1"
+                value={customTaxRate || ''}
+                onChange={(e) => setCustomTaxRate(parseFloat(e.target.value) || 0)}
+                className="w-20 bg-background border border-border rounded-lg py-1 px-2 text-right text-xs text-foreground focus:outline-none focus:border-primary/50"
+              />
+            </div>
+          )}
+
+          {/* Tax breakdown */}
+          {breakdown.map((tax, i) => (
+            <div key={i} className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{tax.label}</span>
+              <span className="font-mono tabular-nums text-muted-foreground">+{currSym}{tax.amount.toFixed(2)}</span>
+            </div>
+          ))}
         </div>
 
-        <button 
-          onClick={handleSave} disabled={loading || netAmount === 0}
-          className="w-full mt-8 flex items-center justify-center gap-2 bg-teal text-navy font-bold py-3.5 rounded-xl hover:bg-teal-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(20,241,149,0.15)]"
+        {/* Divider */}
+        <div className="border-t border-border" />
+
+        {/* Net total */}
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-foreground">Net Amount</span>
+          <span className={cn('font-mono text-xl font-bold tabular-nums', netAmount > 0 ? 'text-primary' : 'text-muted-foreground')}>
+            {currSym}{netAmount.toFixed(2)}
+          </span>
+        </div>
+
+        {/* Save button */}
+        <button
+          onClick={handleSave}
+          disabled={loading || netAmount <= 0}
+          className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold py-3.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-glow"
         >
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <><CheckCircle2 size={18} /> Save & Generate Bill</>}
+          {loading
+            ? <Loader2 size={17} className="animate-spin" />
+            : <><CheckCircle2 size={17} />Save &amp; Generate Bill</>}
         </button>
+
+        {/* Items count hint */}
+        {items.length > 0 && (
+          <p className="text-center text-[11px] text-muted-foreground">
+            {items.length} item{items.length !== 1 ? 's' : ''} · subtotal {currSym}{subtotal.toFixed(2)}
+          </p>
+        )}
       </div>
     </div>
   )

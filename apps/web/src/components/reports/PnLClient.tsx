@@ -2,9 +2,10 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Download, TrendingUp, TrendingDown } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { TrendingUp, TrendingDown, Filter } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 import { usePreferencesStore } from '@/store/usePreferencesStore'
+import { cn } from '@/lib/utils'
 
 interface Account { id: string; name: string; balance: number }
 
@@ -22,118 +23,208 @@ interface PnLClientProps {
 
 export function PnLClient({
   incomeAccounts, expenseAccounts, totalIncome, totalExpenses, netProfit,
-  currency, fromDate, toDate, businessName,
+  currency, fromDate, toDate,
 }: PnLClientProps) {
   const router = useRouter()
   const [from, setFrom] = useState(fromDate.split('T')[0])
-  const [to, setTo] = useState(toDate.split('T')[0])
+  const [to, setTo]     = useState(toDate.split('T')[0])
   const terminologyMode = usePreferencesStore((s) => s.terminologyMode)
   const isSimple = terminologyMode === 'simple'
   const isProfit = netProfit >= 0
+  const fmt = (v: number) => formatCurrency(v, currency)
 
   function applyFilter() {
     router.push(`/reports/pnl?from=${from}&to=${to}`)
   }
 
-  const fmt = (v: number) => formatCurrency(v, currency)
-
   return (
-    <div className="space-y-5">
-      {/* Date filter */}
-      <div className="glass rounded-2xl border border-border/5 p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="block text-[10px] font-semibold text-foreground/30 uppercase tracking-wider mb-1.5">From</label>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-              className="px-3 py-2 rounded-lg bg-foreground/5 border border-border/10 text-foreground text-sm focus:outline-none focus:border-teal/50 transition-all duration-200" />
+    <div className="space-y-4">
+
+      {/* ── Date filter ── */}
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex items-center gap-2 flex-1">
+            <label className="text-[11px] text-muted-foreground whitespace-nowrap w-7">From</label>
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-accent border border-border text-foreground text-xs focus:outline-none focus:border-primary/50 transition-all"
+            />
           </div>
-          <div>
-            <label className="block text-[10px] font-semibold text-foreground/30 uppercase tracking-wider mb-1.5">To</label>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-              className="px-3 py-2 rounded-lg bg-foreground/5 border border-border/10 text-foreground text-sm focus:outline-none focus:border-teal/50 transition-all duration-200" />
+          <div className="flex items-center gap-2 flex-1">
+            <label className="text-[11px] text-muted-foreground whitespace-nowrap w-7">To</label>
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-accent border border-border text-foreground text-xs focus:outline-none focus:border-primary/50 transition-all"
+            />
           </div>
-          <button onClick={applyFilter}
-            className="px-4 py-2 rounded-lg bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all duration-200 shadow-glow">
-            Apply
-          </button>
-          <button onClick={() => window.print()}
-            className="ml-auto flex items-center gap-2 px-4 py-2 rounded-lg border border-border/10 text-foreground/60 hover:text-foreground hover:border-border/20 text-sm transition-all duration-200">
-            <Download size={14} />Export
+          <button
+            onClick={applyFilter}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-all shadow-glow sm:w-auto w-full"
+          >
+            <Filter size={12} />Apply
           </button>
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: isSimple ? 'Total Earnings' : 'Gross Income', value: totalIncome, color: 'text-teal', bg: 'bg-teal/8 border-teal/15' },
-          { label: isSimple ? 'Total Spending' : 'Total Expenses', value: totalExpenses, color: 'text-red-400', bg: 'bg-red-400/8 border-red-400/15' },
-          { label: isSimple ? 'Final Profit' : 'Net Profit / Loss', value: Math.abs(netProfit), color: isProfit ? 'text-green-400' : 'text-red-400', bg: isProfit ? 'bg-green-400/8 border-green-400/15' : 'bg-red-400/8 border-red-400/15' },
-        ].map((card, i) => (
-          <div key={i} className={`glass rounded-2xl p-5 border ${card.bg}`}>
-            <p className="text-xs text-foreground/40 mb-2">{card.label}</p>
-            <p className={`font-mono text-lg sm:text-2xl font-bold tabular-nums ${card.color} ${card.value === 0 ? '!text-foreground/25' : ''}`}>
-              {card.value === 0 ? 'N/A' : (i === 2 && !isProfit ? '(' + fmt(card.value) + ')' : fmt(card.value))}
+      {/* ── Summary cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-card border border-border rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp size={15} className="text-green-500" />
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {isSimple ? 'Total Earnings' : 'Gross Income'}
             </p>
           </div>
-        ))}
+          <p className={cn(
+            'font-mono text-xl font-bold tabular-nums',
+            totalIncome > 0 ? 'text-foreground' : 'text-muted-foreground'
+          )}>
+            {totalIncome > 0 ? fmt(totalIncome) : 'N/A'}
+          </p>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingDown size={15} className="text-red-500" />
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {isSimple ? 'Total Spending' : 'Total Expenses'}
+            </p>
+          </div>
+          <p className={cn(
+            'font-mono text-xl font-bold tabular-nums',
+            totalExpenses > 0 ? 'text-foreground' : 'text-muted-foreground'
+          )}>
+            {totalExpenses > 0 ? fmt(totalExpenses) : 'N/A'}
+          </p>
+        </div>
+
+        <div className={cn(
+          'rounded-2xl p-5 border',
+          isProfit ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20'
+        )}>
+          <div className="flex items-center gap-2 mb-2">
+            {isProfit
+              ? <TrendingUp size={15} className="text-green-500" />
+              : <TrendingDown size={15} className="text-red-500" />}
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {isSimple ? 'Final Profit' : 'Net Profit / Loss'}
+            </p>
+          </div>
+          <p className={cn(
+            'font-mono text-xl font-bold tabular-nums',
+            netProfit === 0
+              ? 'text-muted-foreground'
+              : isProfit
+              ? 'text-green-600 dark:text-green-400'
+              : 'text-red-600 dark:text-red-400'
+          )}>
+            {netProfit === 0
+              ? 'N/A'
+              : isProfit
+              ? fmt(netProfit)
+              : `(${fmt(Math.abs(netProfit))})`}
+          </p>
+        </div>
       </div>
 
-      {/* P&L Statement */}
-      <div className="glass rounded-2xl border border-border/5 overflow-hidden">
-        {/* Income */}
-        <div className="border-b border-border/5">
-          <div className="flex items-center justify-between px-6 py-4 bg-teal/3">
+      {/* ── P&L Statement ── */}
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
+
+        {/* Income section */}
+        <div className="border-b border-border">
+          <div className="flex items-center justify-between px-5 py-4 bg-green-500/5">
             <div className="flex items-center gap-2">
-              <TrendingUp size={15} className="text-teal" />
-              <span className="font-semibold text-foreground text-sm">{isSimple ? 'Money Earned' : 'Income'}</span>
+              <TrendingUp size={14} className="text-green-500" />
+              <span className="font-semibold text-foreground text-sm">
+                {isSimple ? 'Money Earned' : 'Income'}
+              </span>
             </div>
-            <span className={`font-mono text-sm font-bold tabular-nums ${totalIncome > 0 ? 'text-teal' : 'text-foreground/25'}`}>
+            <span className={cn(
+              'font-mono text-sm font-bold tabular-nums',
+              totalIncome > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'
+            )}>
               {totalIncome > 0 ? fmt(totalIncome) : 'N/A'}
             </span>
           </div>
           {incomeAccounts.length === 0 ? (
-            <div className="px-6 py-4 text-sm text-foreground/25 italic">No income recorded for this period</div>
+            <div className="px-5 py-4 text-sm text-muted-foreground italic">
+              No income recorded for this period
+            </div>
           ) : (
-            incomeAccounts.map((acc) => (
-              <div key={acc.id} className="flex items-center justify-between px-6 py-3.5 hover:bg-foreground/[0.02] transition-colors" style={{ minHeight: '56px' }}>
-                <span className="text-sm text-foreground/60">{acc.name}</span>
-                <span className="font-mono text-sm text-foreground/80 tabular-nums">{fmt(acc.balance)}</span>
-              </div>
-            ))
+            <div className="divide-y divide-border/50">
+              {incomeAccounts.map((acc) => (
+                <div
+                  key={acc.id}
+                  className="flex items-center justify-between px-5 py-3 hover:bg-accent/40 transition-colors"
+                >
+                  <span className="text-sm text-muted-foreground">{acc.name}</span>
+                  <span className="font-mono text-sm text-foreground tabular-nums">{fmt(acc.balance)}</span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Expenses */}
-        <div className="border-b border-border/5">
-          <div className="flex items-center justify-between px-6 py-4 bg-red-400/3">
+        {/* Expense section */}
+        <div className="border-b border-border">
+          <div className="flex items-center justify-between px-5 py-4 bg-red-500/5">
             <div className="flex items-center gap-2">
-              <TrendingDown size={15} className="text-red-400" />
-              <span className="font-semibold text-foreground text-sm">{isSimple ? 'Money Spent' : 'Expenses'}</span>
+              <TrendingDown size={14} className="text-red-500" />
+              <span className="font-semibold text-foreground text-sm">
+                {isSimple ? 'Money Spent' : 'Expenses'}
+              </span>
             </div>
-            <span className={`font-mono text-sm font-bold tabular-nums ${totalExpenses > 0 ? 'text-red-400' : 'text-foreground/25'}`}>
+            <span className={cn(
+              'font-mono text-sm font-bold tabular-nums',
+              totalExpenses > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'
+            )}>
               {totalExpenses > 0 ? fmt(totalExpenses) : 'N/A'}
             </span>
           </div>
           {expenseAccounts.length === 0 ? (
-            <div className="px-6 py-4 text-sm text-foreground/25 italic">No expenses recorded for this period</div>
+            <div className="px-5 py-4 text-sm text-muted-foreground italic">
+              No expenses recorded for this period
+            </div>
           ) : (
-            expenseAccounts.map((acc) => (
-              <div key={acc.id} className="flex items-center justify-between px-6 py-3.5 hover:bg-foreground/[0.02] transition-colors" style={{ minHeight: '56px' }}>
-                <span className="text-sm text-foreground/60">{acc.name}</span>
-                <span className="font-mono text-sm text-foreground/80 tabular-nums">{fmt(acc.balance)}</span>
-              </div>
-            ))
+            <div className="divide-y divide-border/50">
+              {expenseAccounts.map((acc) => (
+                <div
+                  key={acc.id}
+                  className="flex items-center justify-between px-5 py-3 hover:bg-accent/40 transition-colors"
+                >
+                  <span className="text-sm text-muted-foreground">{acc.name}</span>
+                  <span className="font-mono text-sm text-foreground tabular-nums">{fmt(acc.balance)}</span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Net P&L */}
-        <div className={`flex items-center justify-between px-6 py-5 ${isProfit ? 'bg-green-400/5' : 'bg-red-400/5'}`}>
-          <span className="font-display font-bold text-foreground">
+        {/* Net row */}
+        <div className={cn(
+          'flex items-center justify-between px-5 py-5',
+          isProfit ? 'bg-green-500/5' : 'bg-red-500/5'
+        )}>
+          <span className="font-semibold text-foreground">
             {isSimple ? 'Final Profit / Loss' : 'Net Profit / (Loss)'}
           </span>
-          <span className={`font-mono text-xl font-bold tabular-nums ${netProfit === 0 ? 'text-foreground/25' : isProfit ? 'text-green-400' : 'text-red-400'}`}>
-            {netProfit === 0 ? 'N/A' : (isProfit ? fmt(netProfit) : `(${fmt(Math.abs(netProfit))})`)}
+          <span className={cn(
+            'font-mono text-lg sm:text-xl font-bold tabular-nums',
+            netProfit === 0
+              ? 'text-muted-foreground'
+              : isProfit
+              ? 'text-green-600 dark:text-green-400'
+              : 'text-red-600 dark:text-red-400'
+          )}>
+            {netProfit === 0
+              ? 'N/A'
+              : isProfit
+              ? fmt(netProfit)
+              : `(${fmt(Math.abs(netProfit))})`}
           </span>
         </div>
       </div>
