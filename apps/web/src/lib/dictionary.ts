@@ -13,6 +13,7 @@ export interface TermDictionary {
   profitAndLoss: string
   balanceSheet: string
   ledger: string
+  invoices: string;
   journal: string
   voucher: string
   debit: string
@@ -59,6 +60,7 @@ export const STANDARD_TERMS: TermDictionary = {
   profitAndLoss: 'Profit & Loss',
   balanceSheet: 'Balance Sheet',
   ledger: 'Ledger',
+  invoices: "Invoices",
   journal: 'Journal',
   voucher: 'Voucher',
   debit: 'Debit',
@@ -100,6 +102,7 @@ export const SIMPLE_TERMS: TermDictionary = {
   profitAndLoss: 'Business Profit',
   balanceSheet: 'Business Summary',
   ledger: 'Account History',
+  invoices: "Bills",
   journal: 'Transaction Log',
   voucher: 'Transaction',
   debit: 'Money In',

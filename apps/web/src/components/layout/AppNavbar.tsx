@@ -595,10 +595,11 @@ export function AppNavbar({ session, businessName }: AppNavbarProps) {
         { label: 'Contra',         href: '/transactions/contra',    icon: ArrowRightLeft, description: 'Cash & bank transfers',             newHref: '/transactions/contra/new',    newLabel: 'New Contra'   },
       ],
     },
-    // {
-    //   label: dict.invoices ?? 'Invoices',
-    //   icon: FileText,
-    // },
+    {
+      label: dict.invoices ?? 'Invoices', // Uncommented and active
+      href: '/invoices',     // Pointing to your invoice list
+      icon: FileText,
+    },
     {
       label: dict.masters ?? 'Masters',
       icon: Layers,
