@@ -163,14 +163,6 @@ const handleManualSync = async () => {
         </div>
       </div>
 
-      
-  <button 
-  onClick={handleManualSync}
-  className="px-3 py-2 text-xs bg-accent rounded-lg hover:bg-accent/80"
->
-  Force Sync Queue
-</button>
-
       {/* Table */}
       <DataTable
         columns={columns}
