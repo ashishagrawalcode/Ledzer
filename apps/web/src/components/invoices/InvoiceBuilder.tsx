@@ -9,7 +9,9 @@ import {
 } from 'lucide-react'
 import { calculateTax } from '@/lib/taxEngine'
 import { createInvoice } from '@/actions/invoice'
+import { useOfflineAction } from '@/hooks/useOfflineAction'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 interface InvoiceBuilderProps {
   businessId: string
@@ -29,7 +31,7 @@ const TAX_SLABS = [
 
 export function InvoiceBuilder({ businessId, currency, parties, products }: InvoiceBuilderProps) {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
+  const { execute, isSyncing } = useOfflineAction()
 
   const [partyId, setPartyId]       = useState('cash')
   const [walkInName, setWalkInName] = useState('')
@@ -61,17 +63,37 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
   }
 
   async function handleSave() {
-    if (netAmount <= 0) return alert('Invoice total must be greater than zero.')
-    setLoading(true)
-    const res = await createInvoice({
+    if (netAmount <= 0) return toast.error('Invoice total must be greater than zero.')
+    if (items.some(i => !i.productId && !i.description)) return toast.error('Please add a product or description.')
+
+    // 3. Prepare the data payload
+    const invoiceData = {
       businessId,
       partyId:    partyId === 'cash' ? undefined : partyId,
       walkInName: partyId === 'cash' ? walkInName : undefined,
-      items, taxRate: actualTaxRate, totalTax, netAmount,
-    })
-    setLoading(false)
-    if (res.success) router.push(`/transactions/sales/${res.id}`)
-    else alert(`Error: ${res.error}`)
+      items, 
+      taxRate: actualTaxRate, 
+      totalTax, 
+      netAmount,
+    }
+
+    const res = await execute('INVOICE', invoiceData, createInvoice)
+
+    if (res?.error) {
+      toast.error(`Error: ${res.error}`)
+    } else {
+      toast.success('Invoice saved successfully!')
+      
+      // If we are online, redirect immediately
+      if (!res.offline && res.id) {
+        router.push(`/transactions/sales/${res.id}`)
+      } else {
+        // If offline, clear the form to let them make another one!
+        setItems([{ productId: '', description: '', qty: 1, price: 0 }])
+        setWalkInName('')
+        router.refresh()
+      }
+    }
   }
 
   const currSym = { INR: '₹', USD: '$', EUR: '€', GBP: '£', NPR: 'Rs.', CAD: 'C$', AUD: 'A$', AED: 'د.إ', SGD: 'S$' }[currency] ?? currency
@@ -79,10 +101,8 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
   return (
     /* Stack vertically on mobile, side-by-side on large screens */
     <div className="flex flex-col lg:flex-row gap-5">
-
       {/* ── LEFT: Form panel ─────────────────────────────────────────────── */}
       <div className="flex-1 bg-card border border-border rounded-2xl overflow-hidden">
-
         {/* Customer row */}
         <div className="p-5 border-b border-border space-y-4">
           <div className="flex items-center justify-between">
@@ -209,7 +229,6 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
 
               {/* ── Mobile card ── */}
               <div className="sm:hidden bg-accent/40 rounded-xl border border-border p-3.5 space-y-3">
-                {/* Product + remove */}
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <select
@@ -230,8 +249,6 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
                     <Trash2 size={15} />
                   </button>
                 </div>
-
-                {/* Description */}
                 <input
                   type="text"
                   placeholder="Description or item name"
@@ -239,8 +256,6 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
                   onChange={(e) => updateItem(idx, 'description', e.target.value)}
                   className="w-full bg-accent border border-border rounded-xl py-2.5 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
                 />
-
-                {/* Qty + Price on same row */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1.5">Quantity</p>
@@ -264,8 +279,6 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
                     </div>
                   </div>
                 </div>
-
-                {/* Line total */}
                 <div className="flex items-center justify-between pt-1 border-t border-border">
                   <span className="text-xs text-muted-foreground">Line total</span>
                   <span className="font-mono text-sm font-semibold text-foreground tabular-nums">
@@ -291,14 +304,12 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
           <FileText size={15} className="text-primary" />Live Summary
         </h3>
 
-        {/* Subtotal */}
         <div className="space-y-3 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Subtotal</span>
             <span className="font-mono tabular-nums text-foreground">{currSym}{subtotal.toFixed(2)}</span>
           </div>
 
-          {/* Tax slab */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 text-muted-foreground flex-shrink-0">
               <Tag size={13} />
@@ -316,7 +327,6 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
             </div>
           </div>
 
-          {/* Custom rate input */}
           {taxSelection === 'custom' && (
             <div className="flex items-center justify-between bg-accent rounded-xl px-3 py-2.5 border border-border animate-fade-up">
               <span className="text-xs text-muted-foreground">Custom rate (%)</span>
@@ -329,7 +339,6 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
             </div>
           )}
 
-          {/* Tax breakdown */}
           {breakdown.map((tax, i) => (
             <div key={i} className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">{tax.label}</span>
@@ -338,10 +347,8 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
           ))}
         </div>
 
-        {/* Divider */}
         <div className="border-t border-border" />
 
-        {/* Net total */}
         <div className="flex items-center justify-between">
           <span className="font-semibold text-foreground">Net Amount</span>
           <span className={cn('font-mono text-xl font-bold tabular-nums', netAmount > 0 ? 'text-primary' : 'text-muted-foreground')}>
@@ -349,18 +356,16 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
           </span>
         </div>
 
-        {/* Save button */}
         <button
           onClick={handleSave}
-          disabled={loading || netAmount <= 0}
+          disabled={isSyncing || netAmount <= 0}
           className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold py-3.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-glow"
         >
-          {loading
+          {isSyncing
             ? <Loader2 size={17} className="animate-spin" />
             : <><CheckCircle2 size={17} />Save &amp; Generate Bill</>}
         </button>
 
-        {/* Items count hint */}
         {items.length > 0 && (
           <p className="text-center text-[11px] text-muted-foreground">
             {items.length} item{items.length !== 1 ? 's' : ''} · subtotal {currSym}{subtotal.toFixed(2)}

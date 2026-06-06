@@ -1,16 +1,19 @@
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Package, Plus, Search, AlertTriangle, TrendingDown,
-  TrendingUp, Edit2, Trash2, X, Save, Loader2, Filter,
-  BarChart3, Tag, Hash, Layers
+  TrendingUp, Edit2, Trash2, X, Save, Loader2,
+  BarChart3
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createProduct, updateProduct, deleteProduct } from '@/actions/inventory'
 import { ExportDropdown } from '@/components/shared/ExportDropdown'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { useOfflineAction } from '@/hooks/useOfflineAction'
+import { toast } from 'sonner'
+import { usePendingItems } from '@/hooks/usePendingItems'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
@@ -86,7 +89,7 @@ interface ProductFormProps {
 }
 
 function ProductForm({ product, currency, onClose }: ProductFormProps) {
-  const [isPending, startTransition] = useTransition()
+  const { execute, isSyncing } = useOfflineAction()
   const [error, setError] = useState<string | null>(null)
   const isEdit = !!product
 
@@ -106,26 +109,36 @@ function ProductForm({ product, currency, onClose }: ProductFormProps) {
       setForm((f) => ({ ...f, [key]: e.target.value }))
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.name.trim()) { setError('Product name is required.'); return }
     setError(null)
-    startTransition(async () => {
-      const payload = {
-        name: form.name.trim(),
-        sku: form.sku.trim() || null,
-        unit: form.unit.trim() || null,
-        stock: form.stock ? parseFloat(form.stock) : null,
-        reorderLevel: form.reorderLevel ? parseFloat(form.reorderLevel) : null,
-        salePrice: form.salePrice ? parseFloat(form.salePrice) : null,
-        purchasePrice: form.purchasePrice ? parseFloat(form.purchasePrice) : null,
-        taxRate: form.taxRate ? parseFloat(form.taxRate) : null,
-      }
-      const res = isEdit
-        ? await updateProduct(product.id, payload)
-        : await createProduct(payload)
-      if (res.success) { onClose() }
-      else { setError(res.error ?? 'Something went wrong.') }
-    })
+    
+    const payload = {
+      name: form.name.trim(),
+      sku: form.sku.trim() || null,
+      unit: form.unit.trim() || null,
+      stock: form.stock ? parseFloat(form.stock) : null,
+      reorderLevel: form.reorderLevel ? parseFloat(form.reorderLevel) : null,
+      salePrice: form.salePrice ? parseFloat(form.salePrice) : null,
+      purchasePrice: form.purchasePrice ? parseFloat(form.purchasePrice) : null,
+      taxRate: form.taxRate ? parseFloat(form.taxRate) : null,
+    }
+
+    // Wrap the actions to accept a single data object for the offline hook
+    const actionData = isEdit ? { id: product!.id, payload } : payload;
+    const actionType = isEdit ? 'PRODUCT_UPDATE' : 'PRODUCT_CREATE';
+    const serverAction = isEdit 
+      ? (data: any) => updateProduct(data.id, data.payload)
+      : (data: any) => createProduct(data);
+
+    const res = await execute(actionType, actionData, serverAction);
+    
+    if (res?.success || res?.offline) { 
+      toast.success(isEdit ? 'Product updated!' : 'Product added!');
+      onClose();
+    } else { 
+      setError(res?.error ?? 'Something went wrong.') 
+    }
   }
 
   return (
@@ -291,11 +304,11 @@ function ProductForm({ product, currency, onClose }: ProductFormProps) {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={isPending}
+            disabled={isSyncing}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-all shadow-glow disabled:opacity-50"
           >
-            {isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {isPending ? 'Saving…' : isEdit ? 'Update' : 'Add Product'}
+            {isSyncing ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {isSyncing ? 'Saving…' : isEdit ? 'Update' : 'Add Product'}
           </button>
         </div>
       </div>
@@ -305,13 +318,21 @@ function ProductForm({ product, currency, onClose }: ProductFormProps) {
 
 // ─── Delete Confirm ───────────────────────────────────────────────────────────
 function DeleteConfirm({ product, onClose }: { product: Product; onClose: () => void }) {
-  const [isPending, startTransition] = useTransition()
+  const { execute, isSyncing } = useOfflineAction()
 
-  function handleDelete() {
-    startTransition(async () => {
-      await deleteProduct(product.id)
+  async function handleDelete() {
+    const res = await execute(
+      'PRODUCT_DELETE', 
+      { id: product.id }, 
+      (data: any) => deleteProduct(data.id)
+    )
+
+    if (res?.error) {
+      toast.error(res.error)
+    } else {
+      toast.success('Product deleted!')
       onClose()
-    })
+    }
   }
 
   return (
@@ -337,11 +358,11 @@ function DeleteConfirm({ product, onClose }: { product: Product; onClose: () => 
           </button>
           <button
             onClick={handleDelete}
-            disabled={isPending}
+            disabled={isSyncing}
             className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-50"
           >
-            {isPending ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-            {isPending ? 'Deleting…' : 'Delete'}
+            {isSyncing ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+            {isSyncing ? 'Deleting…' : 'Delete'}
           </button>
         </div>
       </div>
@@ -359,11 +380,22 @@ export function InventoryClient({ products, currency, search }: InventoryClientP
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [deleteProduct_, setDeleteProduct_] = useState<Product | null>(null)
 
+  
+  const pendingItems = usePendingItems();
+  const pendingProducts = pendingItems
+    .filter((item) => item.type === 'PRODUCT_CREATE')
+    .map((item) => ({
+      id: `pending-${item.id}`,
+      ...item.data,
+    })) as Product[];
+
+  const allProducts = [...pendingProducts, ...products];
+
   // Stats
-  const totalProducts = products.length
-  const lowStock = products.filter(p => p.reorderLevel !== null && p.stock !== null && p.stock <= p.reorderLevel && p.stock > 0).length
-  const outOfStock = products.filter(p => p.stock === 0).length
-  const totalValue = products.reduce((sum, p) => sum + (p.stock ?? 0) * (p.salePrice ?? 0), 0)
+  const totalProducts = allProducts.length
+  const lowStock = allProducts.filter(p => p.reorderLevel !== null && p.stock !== null && p.stock <= p.reorderLevel && p.stock > 0).length
+  const outOfStock = allProducts.filter(p => p.stock === 0).length
+  const totalValue = allProducts.reduce((sum, p) => sum + (p.stock ?? 0) * (p.salePrice ?? 0), 0)
 
   // Filter
   const filtered = products.filter(p => {
@@ -383,7 +415,6 @@ export function InventoryClient({ products, currency, search }: InventoryClientP
 
   return (
     <>
-      {/* 1. NEW: The Header is now inside the Client Component! */}
       <PageHeader
         title="Inventory"
         subtitle={`${products.length} product${products.length !== 1 ? 's' : ''}${lowStock > 0 ? ` · ${lowStock} low stock` : ''}`}
@@ -391,7 +422,7 @@ export function InventoryClient({ products, currency, search }: InventoryClientP
         actions={
           <div className="flex items-center gap-3">
             <ExportDropdown data={products} filename="Inventory_Status" />
-           
+            
             <button
               onClick={() => setShowForm(true)}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-all shadow-glow"

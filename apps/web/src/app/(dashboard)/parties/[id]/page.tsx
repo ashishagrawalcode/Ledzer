@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
-import { prisma } from '@ledzer/database'
+import { prisma as db } from '@ledzer/database'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { PartyDetailClient } from '@/components/parties/PartyDetailClient'
 import { ExportDropdown } from '@/components/shared/ExportDropdown'
@@ -19,11 +19,11 @@ export default async function PartyDetailPage({ params }: Props) {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
-  const business = await prisma.business.findFirst({ where: { ownerId: session.user.id } })
+  const business = await db.business.findFirst({ where: { ownerId: session.user.id } })
   if (!business) redirect('/dashboard')
 
   // Find party and verify it belongs to this business
-  const party = await prisma.party.findFirst({
+  const party = await db.party.findFirst({
     where: { id: params.id, businessId: business.id },
     include: {
       ledger: {
@@ -85,17 +85,17 @@ export default async function PartyDetailPage({ params }: Props) {
     Balance: e.balance,
   }))
 
-  const backHref =
-    party.type === 'CUSTOMER' ? '/parties/customers' : '/parties/suppliers'
+  const backHref = party.type === 'CUSTOMER' ? '/parties/customers' : '/parties/suppliers'
 
   return (
-    <div className="w-full animate-fade-up">
-      <div className="mb-4">
+    <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-up pb-20 md:pb-8">
+      {/* Sleek Mobile-Friendly Back Button */}
+      <div>
         <Link
           href={backHref}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="group inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-all bg-accent/50 hover:bg-accent px-3 py-2 rounded-xl border border-border/50 w-fit"
         >
-          <ArrowLeft size={14} />
+          <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
           Back to {party.type === 'CUSTOMER' ? 'Customers' : 'Suppliers'}
         </Link>
       </div>

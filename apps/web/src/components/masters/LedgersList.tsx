@@ -8,6 +8,7 @@ import { usePreferencesStore } from '@/store/usePreferencesStore'
 import { getGroupLabel } from '@/lib/dictionary'
 import Link from 'next/link'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { usePendingItems } from '@/hooks/usePendingItems' // <-- Imported hook
 
 interface LedgerRow {
   id: string
@@ -18,6 +19,7 @@ interface LedgerRow {
   partyType: string | null
   balance: number
   entryCount: number
+  isPending?: boolean // <-- Added to track offline status
 }
 
 const GROUP_COLORS: Record<string, string> = {
@@ -44,6 +46,31 @@ export function LedgersList({
   const [isPending, startTransition] = useTransition()
   const terminologyMode = usePreferencesStore((s) => s.terminologyMode)
 
+  // 1. Fetch pending ledgers from offline queue
+  const pendingItems = usePendingItems()
+  const pendingLedgers = pendingItems
+    .filter((item) => item.type === 'LEDGER')
+    .map((item) => {
+      // Calculate balance sign based on opening type
+      const amt = item.data.openingBalance || 0;
+      const balance = item.data.openingType === 'CREDIT' ? -amt : amt;
+      
+      return {
+        id: `pending-${item.id}`,
+        name: item.data.name,
+        group: item.data.group,
+        isSystem: false,
+        partyName: null,
+        partyType: null,
+        balance: balance,
+        entryCount: 0,
+        isPending: true,
+      }
+    }) as LedgerRow[]
+
+  // 2. Merge server ledgers with offline ledgers
+  const allLedgers = [...pendingLedgers, ...ledgers]
+
   const pushFilters = debounce((q: string, g: string) => {
     startTransition(() => {
       const params = new URLSearchParams()
@@ -53,9 +80,9 @@ export function LedgersList({
     })
   }, 300)
 
-  // Group ledgers by account group
+  // 3. Group ledgers by account group (Using allLedgers)
   const grouped = GROUPS.reduce((acc, g) => {
-    const items = ledgers.filter((l) => l.group === g)
+    const items = allLedgers.filter((l) => l.group === g)
     if (items.length > 0) acc[g] = items
     return acc
   }, {} as Record<string, LedgerRow[]>)
@@ -93,7 +120,7 @@ export function LedgersList({
       </div>
 
       {/* No results */}
-      {ledgers.length === 0 && (
+      {allLedgers.length === 0 && (
         <div className="glass rounded-2xl border border-border/5 flex flex-col items-center justify-center py-20 gap-3">
           <p className="text-foreground/30">No ledgers found</p>
         </div>
@@ -134,12 +161,22 @@ export function LedgersList({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <Link
-                        href={`/masters/ledgers/${ledger.id}`}
-                        className="text-sm font-medium text-foreground hover:text-teal transition-colors duration-150 flex items-center gap-1 group"
+                        href={ledger.isPending ? '#' : `/masters/ledgers/${ledger.id}`}
+                        className={`text-sm font-medium transition-colors duration-150 flex items-center gap-1 group ${
+                          ledger.isPending ? 'text-foreground/60 cursor-default' : 'text-foreground hover:text-teal'
+                        }`}
                       >
                         {ledger.name}
-                        <ExternalLink size={10} className="opacity-0 group-hover:opacity-60 transition-opacity" />
+                        {!ledger.isPending && <ExternalLink size={10} className="opacity-0 group-hover:opacity-60 transition-opacity" />}
                       </Link>
+                      
+                      {/* Offline Syncing Badge */}
+                      {ledger.isPending && (
+                        <span className="text-[10px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 rounded-md animate-pulse">
+                          Syncing...
+                        </span>
+                      )}
+
                       {ledger.partyType && (
                         <span className="text-[10px] text-foreground/25 bg-foreground/5 px-1.5 py-0.5 rounded">
                           {ledger.partyType}

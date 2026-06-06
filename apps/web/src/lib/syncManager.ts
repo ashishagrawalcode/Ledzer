@@ -1,6 +1,10 @@
 import { createVoucher } from '@/actions/vouchers';
 import { createReceiptPayment } from '@/actions/receiptPayment';
 import { getDB } from '@/lib/db';
+import { createInvoice } from '@/actions/invoice';
+import { createParty } from '@/actions/parties';
+import { createLedger } from '@/actions/ledgers';
+import { createProduct, deleteProduct, updateProduct } from '@/actions/inventory';
 
 const ACTION_MAP: any = {
   'SALES': createVoucher,
@@ -9,6 +13,12 @@ const ACTION_MAP: any = {
   'CONTRA': createVoucher,
   'RECEIPT': createReceiptPayment,
   'PAYMENT': createReceiptPayment,
+  'INVOICE': createInvoice,
+  'PARTY': createParty,
+  'LEDGER': createLedger,
+  'PRODUCT_CREATE': createProduct,
+  'PRODUCT_UPDATE': (data: any) => updateProduct(data.id, data.payload),
+  'PRODUCT_DELETE': (data: any) => deleteProduct(data.id),
 };
 
 export async function processSyncQueue() {

@@ -2,9 +2,10 @@
 
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { Search, Phone, Mail, ExternalLink } from 'lucide-react'
+import { Search, Phone, Mail, ExternalLink, Loader2 } from 'lucide-react'
 import { formatCurrency, getInitials, debounce, truncate } from '@/lib/utils'
 import Link from 'next/link'
+import { usePendingItems } from '@/hooks/usePendingItems' // IMPORTANT: Import the hook
 
 interface PartyRow {
   id: string
@@ -16,6 +17,7 @@ interface PartyRow {
   balance: number
   totalTransacted: number
   txCount: number
+  isPending?: boolean // Required for offline state
 }
 
 export function PartiesList({ parties, currency, search: initialSearch, partyType }: {
@@ -29,6 +31,26 @@ export function PartiesList({ parties, currency, search: initialSearch, partyTyp
   const [searchVal, setSearchVal] = useState(initialSearch)
   const [isPending, startTransition] = useTransition()
 
+  // 1. Fetch pending parties from offline queue
+  const pendingItems = usePendingItems()
+  const pendingParties = pendingItems
+    .filter((item) => item.type === 'PARTY' && item.data.type === partyType)
+    .map((item) => ({
+      id: `pending-${item.id}`,
+      name: item.data.name,
+      type: item.data.type,
+      email: item.data.email || null,
+      phone: item.data.phone || null,
+      gstin: item.data.gstin || null,
+      balance: (item.data.openingType === 'CREDIT' ? -1 : 1) * (parseFloat(item.data.openingBalance) || 0),
+      totalTransacted: 0,
+      txCount: 0,
+      isPending: true,
+    })) as PartyRow[]
+
+  // 2. Merge server parties with offline parties
+  const allParties = [...pendingParties, ...parties]
+
   const pushSearch = debounce((q: string) => {
     startTransition(() => {
       const params = new URLSearchParams()
@@ -39,7 +61,7 @@ export function PartiesList({ parties, currency, search: initialSearch, partyTyp
 
   const isCustomer = partyType === 'CUSTOMER'
 
-  if (parties.length === 0) {
+  if (allParties.length === 0) {
     return (
       <div className="space-y-4">
         <div className="relative max-w-sm">
@@ -75,27 +97,38 @@ export function PartiesList({ parties, currency, search: initialSearch, partyTyp
 
       {/* Grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {parties.map((party) => {
-          const isReceivable = isCustomer && party.balance > 0
-          const isPayable = !isCustomer && party.balance < 0
+        {allParties.map((party) => {
           const pendingAmt = isCustomer ? Math.max(0, party.balance) : Math.max(0, -party.balance)
 
           return (
             <Link
               key={party.id}
-              href={`/parties/${party.id}`}
-              className="glass rounded-2xl p-5 border border-border/5 hover:border-border/10 transition-all duration-200 hover:scale-[1.01] hover:shadow-card group block"
+              href={party.isPending ? '#' : `/parties/${party.id}`}
+              className={`glass rounded-2xl p-5 border transition-all duration-200 group block ${
+                party.isPending 
+                  ? 'border-amber-500/20 opacity-80 cursor-default' 
+                  : 'border-border/5 hover:border-border/10 hover:scale-[1.01] hover:shadow-card'
+              }`}
             >
               <div className="flex items-start gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-teal-gradient flex items-center justify-center text-sm font-bold text-navy flex-shrink-0 shadow-glow-sm">
+                <div className="w-10 h-10 rounded-xl bg-teal-gradient flex items-center justify-center text-sm font-bold text-navy flex-shrink-0 shadow-glow-sm relative">
                   {getInitials(party.name)}
+                  {party.isPending && <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-background animate-pulse" />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1">
-                    <p className="font-semibold text-foreground text-sm truncate group-hover:text-teal transition-colors duration-150">
+                  <div className="flex items-center justify-between gap-1">
+                    <p className={`font-semibold text-sm truncate transition-colors duration-150 ${
+                      party.isPending ? 'text-foreground/70' : 'text-foreground group-hover:text-teal'
+                    }`}>
                       {party.name}
                     </p>
-                    <ExternalLink size={10} className="opacity-0 group-hover:opacity-40 transition-opacity flex-shrink-0" />
+                    {party.isPending ? (
+                       <span className="text-[9px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider flex-shrink-0 flex items-center gap-1">
+                         <Loader2 size={8} className="animate-spin" /> Syncing
+                       </span>
+                    ) : (
+                      <ExternalLink size={10} className="opacity-0 group-hover:opacity-40 transition-opacity flex-shrink-0" />
+                    )}
                   </div>
                   {party.gstin && <p className="text-[10px] text-foreground/25 font-mono mt-0.5">{party.gstin}</p>}
                 </div>

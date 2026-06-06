@@ -1,18 +1,21 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Save, ArrowLeft, AlertCircle } from 'lucide-react'
+import { Save, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react'
 import { createLedger } from '@/actions/ledgers'
 import { usePreferencesStore } from '@/store/usePreferencesStore'
 import { getGroupLabel } from '@/lib/dictionary'
+import { useOfflineAction } from '@/hooks/useOfflineAction'
+import { toast } from 'sonner'
 
 const GROUPS = ['ASSET', 'LIABILITY', 'INCOME', 'EXPENSE', 'EQUITY'] as const
 
 export function NewLedgerForm({ businessId }: { businessId: string }) {
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
+  const { execute, isSyncing } = useOfflineAction()
   const [error, setError] = useState<string | null>(null)
+  
   const [name, setName] = useState('')
   const [group, setGroup] = useState<typeof GROUPS[number]>('ASSET')
   const [openingBalance, setOpeningBalance] = useState('')
@@ -29,24 +32,37 @@ export function NewLedgerForm({ businessId }: { businessId: string }) {
 
   async function handleSubmit() {
     setError(null)
-    if (!name.trim()) { setError('Ledger name is required'); return }
-    startTransition(async () => {
-      const result = await createLedger({
-        businessId,
-        name: name.trim(),
-        group,
-        openingBalance: openingBalance ? parseFloat(openingBalance) : undefined,
-        openingType,
-      })
-      if (result.error) { setError(result.error); return }
-      router.push('/masters/ledgers')
-      router.refresh()
-    })
+    if (!name.trim()) { 
+      setError('Ledger name is required')
+      return 
+    }
+    
+    const ledgerData = {
+      businessId,
+      name: name.trim(),
+      group,
+      openingBalance: openingBalance ? parseFloat(openingBalance) : undefined,
+      openingType,
+    }
+
+    const result = await execute('LEDGER', ledgerData, createLedger)
+    
+    if (result?.error) { 
+      setError(result.error)
+      return 
+    }
+    
+    toast.success('Ledger created!')
+    router.push('/masters/ledgers')
+    router.refresh()
   }
 
   return (
     <div className="space-y-5">
-      <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-foreground/40 hover:text-foreground/70 transition-colors">
+      <button 
+        onClick={() => router.back()} 
+        className="flex items-center gap-1.5 text-sm text-foreground/40 hover:text-foreground/70 transition-colors"
+      >
         <ArrowLeft size={14} />Back
       </button>
 
@@ -123,13 +139,18 @@ export function NewLedgerForm({ businessId }: { businessId: string }) {
         <div className="flex items-center gap-3">
           <button
             onClick={handleSubmit}
-            disabled={isPending}
+            disabled={isSyncing}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all duration-200 shadow-glow disabled:opacity-50"
           >
-            {isPending ? <div className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" /> : <Save size={15} />}
-            {isPending ? 'Saving…' : 'Create Ledger'}
+            {isSyncing ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {isSyncing ? 'Saving…' : 'Create Ledger'}
           </button>
-          <button onClick={() => router.back()} className="px-6 py-3 rounded-xl border border-border/10 text-foreground/60 hover:text-foreground text-sm transition-all duration-200">Cancel</button>
+          <button 
+            onClick={() => router.back()} 
+            className="px-6 py-3 rounded-xl border border-border/10 text-foreground/60 hover:text-foreground text-sm transition-all duration-200"
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
