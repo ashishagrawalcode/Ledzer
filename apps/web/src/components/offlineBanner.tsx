@@ -1,16 +1,22 @@
 'use client'
+
 import { useEffect, useState } from 'react'
 
 export function OfflineBanner() {
   const [isOffline, setIsOffline] = useState(false)
 
   useEffect(() => {
-    const handleStatus = () => setIsOffline(!navigator.onLine)
-    window.addEventListener('offline', handleStatus)
-    window.addEventListener('online', handleStatus)
+    setIsOffline(!navigator.onLine)
+
+    const goOffline = () => setIsOffline(true)
+    const goOnline  = () => setIsOffline(false)
+
+    window.addEventListener('offline', goOffline)
+    window.addEventListener('online',  goOnline)
+
     return () => {
-      window.removeEventListener('offline', handleStatus)
-      window.removeEventListener('online', handleStatus)
+      window.removeEventListener('offline', goOffline)
+      window.removeEventListener('online',  goOnline)
     }
   }, [])
 
