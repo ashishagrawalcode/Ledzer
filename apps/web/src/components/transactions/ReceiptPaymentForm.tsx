@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowDownCircle, ArrowUpCircle, Calendar, FileText,
@@ -36,7 +36,10 @@ export function ReceiptPaymentForm({
   mode, parties, expenseLedgers = [], bankCashLedgers, nextNumber, currency,
 }: ReceiptPaymentFormProps) {
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
+  
+  // FIX: Initialize the hook properly and use its isPending state
+  const { execute, isPending } = useOfflineAction(mode, createReceiptPayment);
+  
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
@@ -63,7 +66,6 @@ export function ReceiptPaymentForm({
       setForm((f) => ({ ...f, [key]: e.target.value }))
   }
 
-  const { execute, isSyncing } = useOfflineAction();
   async function handleSubmit() {
     if (!form.partyLedgerId && payeeType === 'PARTY') { setError('Please select a party.'); return }
     if (!form.bankCashLedgerId) { setError('Please select a cash/bank account.'); return }
@@ -82,20 +84,21 @@ export function ReceiptPaymentForm({
       paymentMode: form.paymentMode,
     };
 
-    startTransition(async () => {
-      const res = await execute(mode, data, createReceiptPayment);
+    // FIX: Execute using the new hook pattern
+    const res = await execute(data);
       
-      if (res?.error) {
-        setError(res.error);
+    if (res?.error) {
+      setError(res.error);
+    } else {
+      setSuccess(true);
+      
+      // FIX: Check res.queued instead of res.offline
+      if (!res.queued) {
+        setTimeout(() => router.push(isReceipt ? '/transactions/receipts' : '/transactions/payments'), 1200);
       } else {
-        setSuccess(true);
-        if (!res.offline) {
-          setTimeout(() => router.push(isReceipt ? '/transactions/receipts' : '/transactions/payments'), 1200);
-        } else {
-          setTimeout(() => setSuccess(false), 3000); // Reset UI after 3s
-        }
+        setTimeout(() => setSuccess(false), 3000); // Reset UI after 3s
       }
-    });
+    }
   }
 
   const currSymbol = { INR: '₹', USD: '$', EUR: '€', GBP: '£' }[currency] ?? currency

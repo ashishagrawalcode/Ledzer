@@ -47,18 +47,17 @@ export function LedgersList({
   const terminologyMode = usePreferencesStore((s) => s.terminologyMode)
 
   // 1. Fetch pending ledgers from offline queue
-  const pendingItems = usePendingItems()
+  const pendingItems = usePendingItems() || []
   const pendingLedgers = pendingItems
-    .filter((item) => item.type === 'LEDGER')
+    .filter((item) => item?.type === 'LEDGER')
     .map((item) => {
-      // Calculate balance sign based on opening type
-      const amt = item.data.openingBalance || 0;
-      const balance = item.data.openingType === 'CREDIT' ? -amt : amt;
+      const amt = parseFloat(item?.data?.openingBalance) || 0;
+      const balance = item?.data?.openingType === 'CREDIT' ? -amt : amt;
       
       return {
         id: `pending-${item.id}`,
-        name: item.data.name,
-        group: item.data.group,
+        name: item?.data?.name || 'Pending Account',
+        group: item?.data?.group || 'ASSET', // Prevents grouping crash
         isSystem: false,
         partyName: null,
         partyType: null,
@@ -69,7 +68,7 @@ export function LedgersList({
     }) as LedgerRow[]
 
   // 2. Merge server ledgers with offline ledgers
-  const allLedgers = [...pendingLedgers, ...ledgers]
+  const allLedgers = [...pendingLedgers, ...(ledgers || [])]
 
   const pushFilters = debounce((q: string, g: string) => {
     startTransition(() => {

@@ -13,7 +13,8 @@ const GROUPS = ['ASSET', 'LIABILITY', 'INCOME', 'EXPENSE', 'EQUITY'] as const
 
 export function NewLedgerForm({ businessId }: { businessId: string }) {
   const router = useRouter()
-  const { execute, isSyncing } = useOfflineAction()
+  // FIX: Initialize hook with the action type and server action
+  const { execute, isPending } = useOfflineAction('LEDGER', createLedger)
   const [error, setError] = useState<string | null>(null)
   
   const [name, setName] = useState('')
@@ -45,14 +46,20 @@ export function NewLedgerForm({ businessId }: { businessId: string }) {
       openingType,
     }
 
-    const result = await execute('LEDGER', ledgerData, createLedger)
+    // FIX: Just pass the payload to execute()
+    const result = await execute(ledgerData)
     
     if (result?.error) { 
       setError(result.error)
       return 
     }
     
-    toast.success('Ledger created!')
+    if (result.queued) {
+      toast.warning('Ledger saved offline! Will sync soon.')
+    } else {
+      toast.success('Ledger created!')
+    }
+    
     router.push('/masters/ledgers')
     router.refresh()
   }
@@ -139,11 +146,11 @@ export function NewLedgerForm({ businessId }: { businessId: string }) {
         <div className="flex items-center gap-3">
           <button
             onClick={handleSubmit}
-            disabled={isSyncing}
+            disabled={isPending}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all duration-200 shadow-glow disabled:opacity-50"
           >
-            {isSyncing ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-            {isSyncing ? 'Saving…' : 'Create Ledger'}
+            {isPending ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {isPending ? 'Saving…' : 'Create Ledger'}
           </button>
           <button 
             onClick={() => router.back()} 

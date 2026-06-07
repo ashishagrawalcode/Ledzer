@@ -1,31 +1,71 @@
-import { useState } from 'react';
-import { toast } from 'sonner';
-import { getDB } from '@/lib/db';
+// src/hooks/useOfflineAction.ts
 
-export function useOfflineAction() {
-  const [isSyncing, setIsSyncing] = useState(false);
+'use client'
 
-  const execute = async (type: string, data: any, serverAction: Function) => {
+import { useState, useCallback } from 'react'
+import { enqueueAction } from '@/lib/offlineDb'
+
+type ActionFn<T> = (data: T) => Promise<{ success?: boolean; error?: string; [key: string]: any }>
+
+interface UseOfflineActionOptions {
+  /** Revalidate these paths after a successful online save */
+  onSuccess?: () => void
+  onError?: (err: string) => void
+  onQueued?: () => void    // called when saved to offline queue
+}
+
+interface OfflineResult {
+  success: boolean
+  queued?: boolean
+  error?: string
+  id?: string
+  [key: string]: any
+}
+
+export function useOfflineAction<T>(
+  actionType: string,
+  serverAction: ActionFn<T>,
+  options: UseOfflineActionOptions = {}
+) {
+  const [isPending, setIsPending] = useState(false)
+  const [isQueued,  setIsQueued]  = useState(false)
+
+  const execute = useCallback(async (data: T): Promise<OfflineResult> => {
+    setIsPending(true)
+    setIsQueued(false)
+
     try {
-      setIsSyncing(true);
-      const result = await serverAction(data);
-      setIsSyncing(false);
-      return result;
-    } catch (err: any) {
-      setIsSyncing(false);
-      
-      // Check for connection failure
-      if (err instanceof TypeError && err.message === 'Failed to fetch') {
-        const db = await getDB();
-        await db.add('pendingActions', { type, data, timestamp: Date.now() });
-        
-        toast.info("Connection unstable. Action queued for sync!");
-        return { success: true, offline: true };
+      // ── Offline path ────────────────────────────────────────────────────
+      if (!navigator.onLine) {
+        await enqueueAction(actionType, data)
+        setIsQueued(true)
+        options.onQueued?.()
+        return { success: true, queued: true }
       }
 
-      return { error: err.message || "Failed to process action" };
-    }
-  };
+      // ── Online path ─────────────────────────────────────────────────────
+      const result = await serverAction(data)
 
-  return { execute, isSyncing };
+      if (result?.success || result?.id || result?.ledgerId) {
+        options.onSuccess?.()
+        // FIX: You MUST spread the result here so the form gets the ID!
+        return { success: true, ...result }
+      } else {
+        const errMsg = result?.error ?? 'Something went wrong.'
+        options.onError?.(errMsg)
+        return { success: false, error: errMsg }
+      }
+    } catch (err) {
+      // Network failed mid-request — queue it
+      console.warn('[useOfflineAction] Network error — queueing for retry:', err)
+      await enqueueAction(actionType, data)
+      setIsQueued(true)
+      options.onQueued?.()
+      return { success: true, queued: true }
+    } finally {
+      setIsPending(false)
+    }
+  }, [actionType, serverAction, options])
+
+  return { execute, isPending, isQueued }
 }

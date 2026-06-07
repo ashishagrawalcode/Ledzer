@@ -32,24 +32,24 @@ export function PartiesList({ parties, currency, search: initialSearch, partyTyp
   const [isPending, startTransition] = useTransition()
 
   // 1. Fetch pending parties from offline queue
-  const pendingItems = usePendingItems()
+  const pendingItems = usePendingItems() || []
   const pendingParties = pendingItems
-    .filter((item) => item.type === 'PARTY' && item.data.type === partyType)
+    .filter((item) => item?.type === 'PARTY' && item?.data?.type?.toUpperCase() === partyType?.toUpperCase())
     .map((item) => ({
       id: `pending-${item.id}`,
-      name: item.data.name,
-      type: item.data.type,
-      email: item.data.email || null,
-      phone: item.data.phone || null,
-      gstin: item.data.gstin || null,
-      balance: (item.data.openingType === 'CREDIT' ? -1 : 1) * (parseFloat(item.data.openingBalance) || 0),
+      name: item?.data?.name || 'Pending Party', // Prevents getInitials from crashing
+      type: item?.data?.type || partyType,
+      email: item?.data?.email || null,
+      phone: item?.data?.phone || null,
+      gstin: item?.data?.gstin || null,
+      balance: (item?.data?.openingType === 'CREDIT' ? -1 : 1) * (parseFloat(item?.data?.openingBalance) || 0),
       totalTransacted: 0,
       txCount: 0,
       isPending: true,
     })) as PartyRow[]
 
   // 2. Merge server parties with offline parties
-  const allParties = [...pendingParties, ...parties]
+  const allParties = [...pendingParties, ...(parties || [])]
 
   const pushSearch = debounce((q: string) => {
     startTransition(() => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Plus, Trash2, Save, AlertTriangle, CheckCircle, Hash, 
@@ -30,7 +30,7 @@ interface VoucherFormProps {
   ledgers: Ledger[]
   returnHref: string
   initialPartyId?: string
-  nextNumber?: string // Added so you can pass the generated number!
+  nextNumber?: string
 }
 
 function genId() {
@@ -48,7 +48,10 @@ export function VoucherForm({
   voucherType, businessId, currency, parties, ledgers, returnHref, initialPartyId, nextNumber = ''
 }: VoucherFormProps) {
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
+  
+  // FIX: Initialize the hook properly and use its isPending state
+  const { execute, isPending } = useOfflineAction(voucherType, createVoucher);
+  
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
@@ -96,39 +99,35 @@ export function VoucherForm({
   const isBalanced = Math.abs(totalDebits - totalCredits) < 0.01
   const hasAmounts = totalDebits > 0
 
-  const { execute, isSyncing } = useOfflineAction();
-
   async function handleSubmit() {
-  setError(null);
-  
-  // 1. Validation Logic
-  if (!isBalanced) { setError('Debits must equal Credits.'); return; }
-  if (!hasAmounts) { setError('Please enter at least one valid amount.'); return; }
-  if (entries.some((e) => !e.ledgerId)) { setError('Please select a ledger.'); return; }
+    setError(null);
+    
+    if (!isBalanced) { setError('Debits must equal Credits.'); return; }
+    if (!hasAmounts) { setError('Please enter at least one valid amount.'); return; }
+    if (entries.some((e) => !e.ledgerId)) { setError('Please select a ledger.'); return; }
 
-  // 2. Prepare the payload
-  const voucherData = {
-    businessId,
-    type: voucherType,
-    date: new Date(form.date),
-    notes: form.notes.trim() || undefined,
-    entries: entries.map((e) => ({
-      ledgerId: e.ledgerId,
-      type: e.type as 'DEBIT' | 'CREDIT',
-      amount: parseFloat(e.amount) || 0,
-    })),
-  };
+    const voucherData = {
+      businessId,
+      type: voucherType,
+      date: new Date(form.date),
+      notes: form.notes.trim() || undefined,
+      entries: entries.map((e) => ({
+        ledgerId: e.ledgerId,
+        type: e.type as 'DEBIT' | 'CREDIT',
+        amount: parseFloat(e.amount) || 0,
+      })),
+    };
 
-  // 3. Execute via the Offline-Aware Hook
-  startTransition(async () => {
-    const result = await execute(voucherType, voucherData, createVoucher);
+    // FIX: Execute using the new hook pattern
+    const result = await execute(voucherData);
 
     if (result?.error) {
       setError(result.error);
     } else {
       setSuccess(true);
       
-      if (!result.offline) {
+      // FIX: Check result.queued instead of result.offline
+      if (!result.queued) {
         setTimeout(() => {
           router.push(returnHref);
           router.refresh();
@@ -137,8 +136,7 @@ export function VoucherForm({
         setTimeout(() => setSuccess(false), 3000);
       }
     }
-  });
-}
+  }
 
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -355,11 +353,11 @@ export function VoucherForm({
         </button>
         <button
           onClick={handleSubmit}
-          disabled={isPending || isSyncing || success || !isBalanced || !hasAmounts}
+          disabled={isPending || success || !isBalanced || !hasAmounts}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all shadow-glow disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isPending || isSyncing ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-          {isPending || isSyncing ? 'Processing…' : 'Save Voucher'}
+          {isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          {isPending ? 'Processing…' : 'Save Voucher'}
         </button>
       </div>
     </div>

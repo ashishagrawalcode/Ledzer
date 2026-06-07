@@ -26,6 +26,7 @@ interface Product {
   salePrice: number | null
   purchasePrice: number | null
   taxRate: number | null
+  isPending?: boolean
 }
 
 interface InventoryClientProps {
@@ -89,9 +90,20 @@ interface ProductFormProps {
 }
 
 function ProductForm({ product, currency, onClose }: ProductFormProps) {
-  const { execute, isSyncing } = useOfflineAction()
-  const [error, setError] = useState<string | null>(null)
   const isEdit = !!product
+  
+  // FIX: dynamically set the action based on if we are editing or creating
+  const serverAction = isEdit 
+    ? (data: any) => updateProduct(data.id, data.payload)
+    : (data: any) => createProduct(data);
+
+  // FIX: Initialize the hook properly
+  const { execute, isPending } = useOfflineAction(
+    isEdit ? 'PRODUCT_UPDATE' : 'PRODUCT_CREATE', 
+    serverAction
+  )
+  
+  const [error, setError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     name: product?.name ?? '',
@@ -124,17 +136,17 @@ function ProductForm({ product, currency, onClose }: ProductFormProps) {
       taxRate: form.taxRate ? parseFloat(form.taxRate) : null,
     }
 
-    // Wrap the actions to accept a single data object for the offline hook
     const actionData = isEdit ? { id: product!.id, payload } : payload;
-    const actionType = isEdit ? 'PRODUCT_UPDATE' : 'PRODUCT_CREATE';
-    const serverAction = isEdit 
-      ? (data: any) => updateProduct(data.id, data.payload)
-      : (data: any) => createProduct(data);
 
-    const res = await execute(actionType, actionData, serverAction);
+    // FIX: Execute via hook
+    const res = await execute(actionData);
     
-    if (res?.success || res?.offline) { 
-      toast.success(isEdit ? 'Product updated!' : 'Product added!');
+    if (res?.success || res?.queued) { 
+      if (res?.queued) {
+        toast.warning(isEdit ? 'Product update saved offline!' : 'New product saved offline!');
+      } else {
+        toast.success(isEdit ? 'Product updated!' : 'Product added!');
+      }
       onClose();
     } else { 
       setError(res?.error ?? 'Something went wrong.') 
@@ -304,11 +316,11 @@ function ProductForm({ product, currency, onClose }: ProductFormProps) {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={isSyncing}
+            disabled={isPending}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-all shadow-glow disabled:opacity-50"
           >
-            {isSyncing ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {isSyncing ? 'Saving…' : isEdit ? 'Update' : 'Add Product'}
+            {isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {isPending ? 'Saving…' : isEdit ? 'Update' : 'Add Product'}
           </button>
         </div>
       </div>
@@ -318,19 +330,21 @@ function ProductForm({ product, currency, onClose }: ProductFormProps) {
 
 // ─── Delete Confirm ───────────────────────────────────────────────────────────
 function DeleteConfirm({ product, onClose }: { product: Product; onClose: () => void }) {
-  const { execute, isSyncing } = useOfflineAction()
+  // FIX: Initialize the hook properly for deletes
+  const { execute, isPending } = useOfflineAction('PRODUCT_DELETE', (data: any) => deleteProduct(data.id))
 
   async function handleDelete() {
-    const res = await execute(
-      'PRODUCT_DELETE', 
-      { id: product.id }, 
-      (data: any) => deleteProduct(data.id)
-    )
+    // FIX: execute with just the payload
+    const res = await execute({ id: product.id })
 
     if (res?.error) {
       toast.error(res.error)
     } else {
-      toast.success('Product deleted!')
+      if (res?.queued) {
+        toast.warning('Product deletion queued offline.')
+      } else {
+        toast.success('Product deleted!')
+      }
       onClose()
     }
   }
@@ -358,11 +372,11 @@ function DeleteConfirm({ product, onClose }: { product: Product; onClose: () => 
           </button>
           <button
             onClick={handleDelete}
-            disabled={isSyncing}
+            disabled={isPending}
             className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-50"
           >
-            {isSyncing ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-            {isSyncing ? 'Deleting…' : 'Delete'}
+            {isPending ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+            {isPending ? 'Deleting…' : 'Delete'}
           </button>
         </div>
       </div>
@@ -380,13 +394,13 @@ export function InventoryClient({ products, currency, search }: InventoryClientP
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [deleteProduct_, setDeleteProduct_] = useState<Product | null>(null)
 
-  
   const pendingItems = usePendingItems();
   const pendingProducts = pendingItems
     .filter((item) => item.type === 'PRODUCT_CREATE')
     .map((item) => ({
       id: `pending-${item.id}`,
       ...item.data,
+      isPending: true,
     })) as Product[];
 
   const allProducts = [...pendingProducts, ...products];
@@ -398,7 +412,7 @@ export function InventoryClient({ products, currency, search }: InventoryClientP
   const totalValue = allProducts.reduce((sum, p) => sum + (p.stock ?? 0) * (p.salePrice ?? 0), 0)
 
   // Filter
-  const filtered = products.filter(p => {
+  const filtered = allProducts.filter(p => {
     if (filter === 'low') return p.reorderLevel !== null && p.stock !== null && p.stock <= p.reorderLevel && p.stock > 0
     if (filter === 'out') return p.stock === 0
     return true
@@ -417,7 +431,7 @@ export function InventoryClient({ products, currency, search }: InventoryClientP
     <>
       <PageHeader
         title="Inventory"
-        subtitle={`${products.length} product${products.length !== 1 ? 's' : ''}${lowStock > 0 ? ` · ${lowStock} low stock` : ''}`}
+        subtitle={`${allProducts.length} product${allProducts.length !== 1 ? 's' : ''}${lowStock > 0 ? ` · ${lowStock} low stock` : ''}`}
         badge="Inventory"
         actions={
           <div className="flex items-center gap-3">
@@ -530,6 +544,11 @@ export function InventoryClient({ products, currency, search }: InventoryClientP
                           </div>
                           <div>
                             <p className="font-medium text-foreground leading-tight">{p.name}</p>
+                            {p.isPending && (
+                              <span className="text-[9px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 rounded-md animate-pulse whitespace-nowrap">
+                                SYNCING
+                              </span>
+                            )}
                             {p.unit && <p className="text-xs text-muted-foreground mt-0.5">per {p.unit}</p>}
                           </div>
                         </div>
@@ -588,6 +607,11 @@ export function InventoryClient({ products, currency, search }: InventoryClientP
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-foreground text-sm leading-tight truncate">{p.name}</p>
+                      {p.isPending && (
+                        <span className="text-[9px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 rounded-md animate-pulse whitespace-nowrap">
+                          SYNCING
+                        </span>
+                      )}
                       <p className="text-xs text-muted-foreground mt-0.5 font-mono">{p.sku ?? 'No SKU'}</p>
                     </div>
                   </div>

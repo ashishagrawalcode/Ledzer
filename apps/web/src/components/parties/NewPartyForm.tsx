@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Save, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react'
+import { Save, AlertCircle, Loader2 } from 'lucide-react'
 import { createParty } from '@/actions/parties'
 import { useOfflineAction } from '@/hooks/useOfflineAction'
 import { toast } from 'sonner'
@@ -15,7 +15,8 @@ interface NewPartyFormProps {
 
 export function NewPartyForm({ businessId, partyType, returnHref }: NewPartyFormProps) {
   const router = useRouter()
-  const { execute, isSyncing } = useOfflineAction()
+  // FIX: Initialize hook with the action type and server action
+  const { execute, isPending } = useOfflineAction('PARTY', createParty)
   const [error, setError] = useState<string | null>(null)
   
   const [name, setName] = useState('')
@@ -45,14 +46,20 @@ export function NewPartyForm({ businessId, partyType, returnHref }: NewPartyForm
       openingType,
     }
 
-    const result = await execute('PARTY', partyData, createParty)
+    // FIX: Just pass the payload to execute()
+    const result = await execute(partyData)
     
     if (result?.error) { 
       setError(result.error)
       return 
     }
     
-    toast.success(`${label} saved!`)
+    if (result.queued) {
+      toast.warning(`${label} saved offline! Will sync soon.`)
+    } else {
+      toast.success(`${label} saved!`)
+    }
+    
     router.push(returnHref)
     router.refresh()
   }
@@ -142,11 +149,11 @@ export function NewPartyForm({ businessId, partyType, returnHref }: NewPartyForm
         <div className="flex items-center gap-3">
           <button 
             onClick={handleSubmit} 
-            disabled={isSyncing}
+            disabled={isPending}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all duration-200 shadow-glow disabled:opacity-50"
           >
-            {isSyncing ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-            {isSyncing ? 'Saving…' : `Create ${label}`}
+            {isPending ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {isPending ? 'Saving…' : `Create ${label}`}
           </button>
           <button 
             onClick={() => router.back()} 

@@ -1,6 +1,7 @@
+// src/lib/syncManager.ts
 import { createVoucher } from '@/actions/vouchers';
 import { createReceiptPayment } from '@/actions/receiptPayment';
-import { getDB } from '@/lib/db';
+import { getOfflineDB, deleteAction } from '@/lib/offlineDb';
 import { createInvoice } from '@/actions/invoice';
 import { createParty } from '@/actions/parties';
 import { createLedger } from '@/actions/ledgers';
@@ -21,29 +22,61 @@ const ACTION_MAP: any = {
   'PRODUCT_DELETE': (data: any) => deleteProduct(data.id),
 };
 
+let isSyncing = false;
+
 export async function processSyncQueue() {
-  const db = await getDB();
+  if (isSyncing) {
+    console.log("Sync already in progress, skipping loop...");
+    return;
+  }
+  
+  isSyncing = true;
 
-  // 1. Get all items (this finishes the read transaction immediately)
-  const pending = await db.getAll('pendingActions');
+  try {
+    const db = await getOfflineDB();
+    const pending = await db.getAll('pendingActions');
 
-  for (const item of pending) {
-    const action = ACTION_MAP[item.type];
-    if (action) {
+    if (pending.length === 0) return;
+
+    console.log(`Starting sync for ${pending.length} items...`);
+
+    for (const item of pending) {
+      const action = ACTION_MAP[item.type];
+      
+      if (!action) {
+        console.warn(`Unknown action type: ${item.type}. Deleting to prevent jam.`);
+        await deleteAction(item.id);
+        continue;
+      }
+
       try {
-        // 2. Perform network request outside of any transaction
         const result = await action(item.data);
         
-        // 3. If successful, open a NEW transaction to delete
-        if (result.success) {
-          await db.delete('pendingActions', item.id);
-          console.log("Successfully synced and deleted item:", item.id);
+        if (result && !result.error) {
+          await deleteAction(item.id);
+          console.log(`✅ Synced and deleted: ${item.type} (${item.id})`);
         } else {
-          console.error("Server rejected item:", item.id, result.error);
+          console.error(`❌ Server rejected ${item.type}:`, result);
         }
       } catch (err) {
-        console.error("Network error processing item:", item.id, err);
+        console.error(`⚠️ Network error on ${item.type}:`, err);
+        break; 
       }
     }
+  } finally {
+    isSyncing = false;
   }
+}
+
+export function startSyncListener(onSynced: (count: number) => void) {
+  const handleOnline = async () => {
+    const db = await getOfflineDB();
+    const count = await db.count('pendingActions');
+    if (count > 0) {
+      await processSyncQueue();
+      onSynced(count);
+    }
+  };
+  window.addEventListener('online', handleOnline);
+  return () => window.removeEventListener('online', handleOnline);
 }

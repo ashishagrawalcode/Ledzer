@@ -31,7 +31,9 @@ const TAX_SLABS = [
 
 export function InvoiceBuilder({ businessId, currency, parties, products }: InvoiceBuilderProps) {
   const router = useRouter()
-  const { execute, isSyncing } = useOfflineAction()
+  
+  // FIX: Initialize the hook properly
+  const { execute, isPending } = useOfflineAction('INVOICE', createInvoice)
 
   const [partyId, setPartyId]       = useState('cash')
   const [walkInName, setWalkInName] = useState('')
@@ -77,15 +79,20 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
       netAmount,
     }
 
-    const res = await execute('INVOICE', invoiceData, createInvoice)
+    // FIX: Just pass the payload
+    const res = await execute(invoiceData)
 
     if (res?.error) {
       toast.error(`Error: ${res.error}`)
     } else {
-      toast.success('Invoice saved successfully!')
+      if (res?.queued) {
+        toast.warning('Invoice saved offline! Will sync soon.')
+      } else {
+        toast.success('Invoice saved successfully!')
+      }
       
-      // If we are online, redirect immediately
-      if (!res.offline && res.id) {
+      // FIX: check queued instead of offline
+      if (!res.queued && res.id) {
         router.push(`/transactions/sales/${res.id}`)
       } else {
         // If offline, clear the form to let them make another one!
@@ -99,7 +106,6 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
   const currSym = { INR: '₹', USD: '$', EUR: '€', GBP: '£', NPR: 'Rs.', CAD: 'C$', AUD: 'A$', AED: 'د.إ', SGD: 'S$' }[currency] ?? currency
 
   return (
-    /* Stack vertically on mobile, side-by-side on large screens */
     <div className="flex flex-col lg:flex-row gap-5">
       {/* ── LEFT: Form panel ─────────────────────────────────────────────── */}
       <div className="flex-1 bg-card border border-border rounded-2xl overflow-hidden">
@@ -358,10 +364,10 @@ export function InvoiceBuilder({ businessId, currency, parties, products }: Invo
 
         <button
           onClick={handleSave}
-          disabled={isSyncing || netAmount <= 0}
+          disabled={isPending || netAmount <= 0}
           className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold py-3.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-glow"
         >
-          {isSyncing
+          {isPending
             ? <Loader2 size={17} className="animate-spin" />
             : <><CheckCircle2 size={17} />Save &amp; Generate Bill</>}
         </button>
