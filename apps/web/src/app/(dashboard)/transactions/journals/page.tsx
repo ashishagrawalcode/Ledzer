@@ -21,48 +21,43 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
   const page = Math.max(1, Number(searchParams.page ?? 1))
   const pageSize = 20
   const search = searchParams.search?.trim() ?? ''
+  const searchFilter = search
+    ? {
+        OR: [
+          { number: { contains: search, mode: 'insensitive' as const } },
+          { notes:  { contains: search, mode: 'insensitive' as const } },
+          { entries: { some: { ledger: { name: { contains: search, mode: 'insensitive' as const } } } } },
+        ],
+      }
+    : {}
 
   const [vouchers, total] = await Promise.all([
     db.voucher.findMany({
-      where: {
-        businessId: business.id,
-        type: 'JOURNAL',
-        ...(search ? {
-          OR: [
-            { number: { contains: search, mode: 'insensitive' } },
-            { notes: { contains: search, mode: 'insensitive' } },
-          ],
-        } : {}),
-      },
+      where: { businessId: business.id, type: 'JOURNAL', ...searchFilter },
       orderBy: { date: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: {
         entries: {
-          include: { ledger: { select: { name: true, group: true, party: { select: { name: true, type: true } } } } }
-        }
+          include: { ledger: { select: { name: true, group: true, party: { select: { name: true, type: true } } } } },
+        },
       },
     }),
-    db.voucher.count({
-      where: { businessId: business.id, type: 'JOURNAL', ...(search ? { OR: [{ number: { contains: search, mode: 'insensitive' } }, { notes: { contains: search, mode: 'insensitive' } }] } : {}) },
-    }),
+    db.voucher.count({ where: { businessId: business.id, type: 'JOURNAL', ...searchFilter } }),
   ])
 
   const rows = vouchers.map((v) => {
-    // Journal entries might involve a party (e.g. adjusting a customer balance) or just regular ledgers.
-    // We try to find a party first, if none exists, we display the primary Debit Ledger name.
-    const partyEntry = v.entries.find((e) => e.ledger.party)
-    const primaryDebitEntry = v.entries.find((e) => e.type === 'DEBIT')
-    const totalDebit = v.entries.filter((e) => e.type === 'DEBIT').reduce((s, e) => s + e.amount, 0)
-    
+    const partyEntry      = v.entries.find((e) => e.ledger.party)
+    const primaryDebit    = v.entries.find((e) => e.type === 'DEBIT')
     return {
-      id: v.id,
-      number: v.number,
-      date: v.date,
-      type: v.type,
-      partyName: partyEntry?.ledger.party?.name ?? primaryDebitEntry?.ledger.name ?? 'Adjustment',
-      amount: totalDebit,
-      notes: v.notes,
+      id:         v.id,
+      number:     v.number,
+      date:       v.date,
+      type:       v.type,
+      partyName:  partyEntry?.ledger.party?.name ?? primaryDebit?.ledger.name ?? 'Adjustment',
+      amount:     v.entries.filter((e) => e.type === 'DEBIT').reduce((s, e) => s + e.amount, 0),
+      notes:      v.notes,
+      businessId: v.businessId,
     }
   })
 
@@ -75,7 +70,6 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
         actions={
           <div className="flex items-center gap-3">
             <ExportDropdown data={rows} filename="Journal_Entries" />
-            
             <Link
               href="/transactions/journals/new"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all duration-200 shadow-glow"
@@ -96,6 +90,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
         search={search}
         baseHref="/transactions/journals"
         voucherType="JOURNAL"
+        businessId={business.id}
       />
     </div>
   )

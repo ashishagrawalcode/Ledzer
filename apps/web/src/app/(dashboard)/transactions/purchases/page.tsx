@@ -24,7 +24,13 @@ export default async function PurchasesPage({
   const pageSize = 20
   const search = searchParams.search?.trim() ?? ''
   const searchFilter = search
-    ? { OR: [{ number: { contains: search, mode: 'insensitive' as const } }, { notes: { contains: search, mode: 'insensitive' as const } }] }
+    ? {
+        OR: [
+          { number: { contains: search, mode: 'insensitive' as const } },
+          { notes:  { contains: search, mode: 'insensitive' as const } },
+          { entries: { some: { ledger: { party: { name: { contains: search, mode: 'insensitive' as const } } } } } },
+        ],
+      }
     : {}
 
   const [vouchers, total] = await Promise.all([
@@ -45,13 +51,14 @@ export default async function PurchasesPage({
   const rows = vouchers.map((v) => {
     const partyEntry = v.entries.find((e) => e.ledger.party)
     return {
-      id: v.id,
-      number: v.number,
-      date: v.date,
-      type: v.type,
-      partyName: partyEntry?.ledger.party?.name ?? null,
-      amount: v.entries.filter((e) => e.type === 'DEBIT').reduce((s, e) => s + e.amount, 0),
-      notes: v.notes,
+      id:         v.id,
+      number:     v.number,
+      date:       v.date,
+      type:       v.type,
+      partyName:  partyEntry?.ledger.party?.name ?? null,
+      amount:     v.entries.filter((e) => e.type === 'DEBIT').reduce((s, e) => s + e.amount, 0),
+      notes:      v.notes,
+      businessId: v.businessId,
     }
   })
 
@@ -83,6 +90,7 @@ export default async function PurchasesPage({
         search={search}
         baseHref="/transactions/purchases"
         voucherType="PURCHASE"
+        businessId={business.id}
       />
     </div>
   )

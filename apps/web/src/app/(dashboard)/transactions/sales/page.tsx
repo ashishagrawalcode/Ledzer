@@ -21,44 +21,42 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   const page = Math.max(1, Number(searchParams.page ?? 1))
   const pageSize = 20
   const search = searchParams.search?.trim() ?? ''
+  const searchFilter = search
+    ? {
+        OR: [
+          { number: { contains: search, mode: 'insensitive' as const } },
+          { notes:  { contains: search, mode: 'insensitive' as const } },
+          { entries: { some: { ledger: { party: { name: { contains: search, mode: 'insensitive' as const } } } } } },
+        ],
+      }
+    : {}
 
   const [vouchers, total] = await Promise.all([
     db.voucher.findMany({
-      where: {
-        businessId: business.id,
-        type: 'SALES',
-        ...(search ? {
-          OR: [
-            { number: { contains: search, mode: 'insensitive' } },
-            { notes: { contains: search, mode: 'insensitive' } },
-          ],
-        } : {}),
-      },
+      where: { businessId: business.id, type: 'SALES', ...searchFilter },
       orderBy: { date: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: {
         entries: {
-          include: { ledger: { select: { name: true, group: true, party: { select: { name: true, type: true } } } } }
-        }
+          include: { ledger: { select: { name: true, group: true, party: { select: { name: true, type: true } } } } },
+        },
       },
     }),
-    db.voucher.count({
-      where: { businessId: business.id, type: 'SALES', ...(search ? { OR: [{ number: { contains: search, mode: 'insensitive' } }, { notes: { contains: search, mode: 'insensitive' } }] } : {}) },
-    }),
+    db.voucher.count({ where: { businessId: business.id, type: 'SALES', ...searchFilter } }),
   ])
 
   const rows = vouchers.map((v) => {
     const partyEntry = v.entries.find((e) => e.ledger.party)
-    const totalDebit = v.entries.filter((e) => e.type === 'DEBIT').reduce((s, e) => s + e.amount, 0)
     return {
-      id: v.id,
-      number: v.number,
-      date: v.date,
-      type: v.type,
-      partyName: partyEntry?.ledger.party?.name ?? null,
-      amount: totalDebit,
-      notes: v.notes,
+      id:         v.id,
+      number:     v.number,
+      date:       v.date,
+      type:       v.type,
+      partyName:  partyEntry?.ledger.party?.name ?? null,
+      amount:     v.entries.filter((e) => e.type === 'DEBIT').reduce((s, e) => s + e.amount, 0),
+      notes:      v.notes,
+      businessId: v.businessId,
     }
   })
 
@@ -71,7 +69,6 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
         actions={
           <div className="flex items-center gap-3">
             <ExportDropdown data={rows} filename="Sales_Invoices" />
-            
             <Link
               href="/transactions/sales/new"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all duration-200 shadow-glow"
@@ -92,6 +89,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
         search={search}
         baseHref="/transactions/sales"
         voucherType="SALES"
+        businessId={business.id}
       />
     </div>
   )

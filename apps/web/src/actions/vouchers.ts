@@ -100,3 +100,44 @@ export async function deleteVoucher(id: string, businessId: string) {
     return { error: 'Failed to delete voucher.' }
   }
 }
+
+interface UpdateVoucherInput {
+  date:      Date
+  notes:     string | null
+  netAmount: number
+  taxRate:   number
+  totalTax:  number
+}
+
+export async function updateVoucher(id: string, businessId: string, input: UpdateVoucherInput) {
+  try {
+    const voucher = await db.voucher.findFirst({ where: { id, businessId } })
+    if (!voucher) return { error: 'Voucher not found.' }
+
+    if (input.netAmount <= 0) return { error: 'Amount must be greater than zero.' }
+
+    await db.voucher.update({
+      where: { id },
+      data: {
+        date:      input.date,
+        notes:     input.notes,
+        netAmount: input.netAmount,
+        taxRate:   input.taxRate,
+        totalTax:  input.totalTax,
+      },
+    })
+
+    revalidatePath('/dashboard')
+    revalidatePath('/transactions/sales')
+    revalidatePath('/transactions/purchases')
+    revalidatePath('/transactions/receipts')
+    revalidatePath('/transactions/payments')
+    revalidatePath('/transactions/journals')
+    revalidatePath('/transactions/contra')
+
+    return { success: true }
+  } catch (error) {
+    console.error('Update voucher error:', error)
+    return { error: 'Failed to update voucher. Please try again.' }
+  }
+}

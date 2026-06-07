@@ -7,11 +7,11 @@ import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { ExportDropdown } from '@/components/shared/ExportDropdown'
 
-export const metadata = { title: 'Contra Entries · Ledzer' }
+export const metadata = { title: 'Journal Entries · Ledzer' }
 
 interface SearchParams { page?: string; search?: string }
 
-export default async function ContraPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function JournalPage({ searchParams }: { searchParams: SearchParams }) {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
@@ -21,71 +21,61 @@ export default async function ContraPage({ searchParams }: { searchParams: Searc
   const page = Math.max(1, Number(searchParams.page ?? 1))
   const pageSize = 20
   const search = searchParams.search?.trim() ?? ''
+  const searchFilter = search
+    ? {
+        OR: [
+          { number: { contains: search, mode: 'insensitive' as const } },
+          { notes:  { contains: search, mode: 'insensitive' as const } },
+          { entries: { some: { ledger: { name: { contains: search, mode: 'insensitive' as const } } } } },
+        ],
+      }
+    : {}
 
   const [vouchers, total] = await Promise.all([
     db.voucher.findMany({
-      where: {
-        businessId: business.id,
-        type: 'CONTRA',
-        ...(search ? {
-          OR: [
-            { number: { contains: search, mode: 'insensitive' } },
-            { notes: { contains: search, mode: 'insensitive' } },
-          ],
-        } : {}),
-      },
+      where: { businessId: business.id, type: 'JOURNAL', ...searchFilter },
       orderBy: { date: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: {
         entries: {
-          include: { ledger: { select: { name: true, group: true } } }
-        }
+          include: { ledger: { select: { name: true, group: true, party: { select: { name: true, type: true } } } } },
+        },
       },
     }),
-    db.voucher.count({
-      where: { businessId: business.id, type: 'CONTRA', ...(search ? { OR: [{ number: { contains: search, mode: 'insensitive' } }, { notes: { contains: search, mode: 'insensitive' } }] } : {}) },
-    }),
+    db.voucher.count({ where: { businessId: business.id, type: 'JOURNAL', ...searchFilter } }),
   ])
 
   const rows = vouchers.map((v) => {
-    // For Contra, there is no "Party". It's a transfer between accounts.
-    // We map the "partyName" field to show the flow of funds: "From (Credit) -> To (Debit)"
-    const debitEntry = v.entries.find((e) => e.type === 'DEBIT')
-    const creditEntry = v.entries.find((e) => e.type === 'CREDIT')
-    const totalDebit = v.entries.filter((e) => e.type === 'DEBIT').reduce((s, e) => s + e.amount, 0)
-    
-    const transferSummary = debitEntry && creditEntry 
-      ? `${creditEntry.ledger.name} → ${debitEntry.ledger.name}`
-      : 'Internal Transfer'
-
+    const partyEntry      = v.entries.find((e) => e.ledger.party)
+    const primaryDebit    = v.entries.find((e) => e.type === 'DEBIT')
     return {
-      id: v.id,
-      number: v.number,
-      date: v.date,
-      type: v.type,
-      partyName: transferSummary,
-      amount: totalDebit,
-      notes: v.notes,
+      id:         v.id,
+      number:     v.number,
+      date:       v.date,
+      type:       v.type,
+      partyName:  partyEntry?.ledger.party?.name ?? primaryDebit?.ledger.name ?? 'Adjustment',
+      amount:     v.entries.filter((e) => e.type === 'DEBIT').reduce((s, e) => s + e.amount, 0),
+      notes:      v.notes,
+      businessId: v.businessId,
     }
   })
 
   return (
     <div className="w-full animate-fade-up">
       <PageHeader
-        title="Contra Entries"
+        title="Journal Entries"
         subtitle={`${total} entry${total !== 1 ? 's' : ''} total`}
         badge="Transactions"
         actions={
           <div className="flex items-center gap-3">
-            <ExportDropdown data={rows} filename="Contra_Entries" />
-            
+            <ExportDropdown data={rows} filename="Journal_Entries" />
             <Link
-              href="/transactions/contra/new"
+              href="/transactions/journals/new"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal text-navy font-semibold text-sm hover:bg-teal-hover transition-all duration-200 shadow-glow"
             >
               <Plus size={15} />
-              <span className="hidden sm:inline">New Contra</span>
+              <span className="hidden sm:inline">New Journal</span>
               <span className="sm:hidden">New</span>
             </Link>
           </div>
@@ -98,8 +88,9 @@ export default async function ContraPage({ searchParams }: { searchParams: Searc
         page={page}
         pageSize={pageSize}
         search={search}
-        baseHref="/transactions/contra"
-        voucherType="CONTRA"
+        baseHref="/transactions/journals"
+        voucherType="JOURNAL"
+        businessId={business.id}
       />
     </div>
   )
